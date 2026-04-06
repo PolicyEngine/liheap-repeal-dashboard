@@ -105,7 +105,8 @@ export default function AggregateImpact() {
   useEffect(() => {
     async function loadData() {
       try {
-        const res = await fetch('/data/aggregate_impact.json');
+        const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+        const res = await fetch(`${basePath}/data/aggregate_impact.json`);
         if (!res.ok) throw new Error(`Failed to load: ${res.status}`);
         setAllData(await res.json());
       } catch (err) {
