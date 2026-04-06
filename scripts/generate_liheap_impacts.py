@@ -87,6 +87,10 @@ def calculate_state_impact(state, config):
         "in_deep_poverty", period=YEAR, map_to="person"
     )
 
+    # Compute weighted poverty rates from MicroSeries BEFORE converting to numpy
+    poverty_baseline_rate = float(baseline_pov.mean() * 100)
+    deep_poverty_baseline_rate = float(baseline_deep_pov.mean() * 100)
+
     decile = baseline.calc(
         "household_income_decile", period=YEAR, map_to="household"
     )
@@ -95,6 +99,7 @@ def calculate_state_impact(state, config):
         "household_count_people", period=YEAR, map_to="household"
     )
 
+    # Convert to numpy only for child poverty filtering
     age_arr = np.array(baseline.calc("age", period=YEAR))
     is_child = age_arr < 18
     pw_arr = np.array(baseline.calc("person_weight", period=YEAR))
@@ -121,6 +126,10 @@ def calculate_state_impact(state, config):
     reform_deep_pov = reformed.calc(
         "in_deep_poverty", period=YEAR, map_to="person"
     )
+
+    # Compute weighted poverty rates from MicroSeries BEFORE converting to numpy
+    poverty_reform_rate = float(reform_pov.mean() * 100)
+    deep_poverty_reform_rate = float(reform_deep_pov.mean() * 100)
 
     reform_pov_arr = np.array(reform_pov).astype(bool)
     reform_deep_pov_arr = np.array(reform_deep_pov).astype(bool)
@@ -208,9 +217,8 @@ def calculate_state_impact(state, config):
     }
 
     # ===== POVERTY IMPACT =====
-    poverty_baseline_rate = float(np.mean(baseline_pov_arr) * 100)
-    poverty_reform_rate = float(np.mean(reform_pov_arr) * 100)
-
+    # Overall and deep rates already computed above from MicroSeries (.mean()).
+    # Only child rates need numpy + manual weighting for age filtering.
     def _child_rate(arr):
         return (
             float((arr[is_child] * child_w).sum() / total_child_w * 100)
@@ -220,9 +228,6 @@ def calculate_state_impact(state, config):
 
     child_poverty_baseline_rate = _child_rate(baseline_pov_arr)
     child_poverty_reform_rate = _child_rate(reform_pov_arr)
-
-    deep_poverty_baseline_rate = float(np.mean(baseline_deep_pov_arr) * 100)
-    deep_poverty_reform_rate = float(np.mean(reform_deep_pov_arr) * 100)
 
     deep_child_poverty_baseline_rate = _child_rate(baseline_deep_pov_arr)
     deep_child_poverty_reform_rate = _child_rate(reform_deep_pov_arr)
