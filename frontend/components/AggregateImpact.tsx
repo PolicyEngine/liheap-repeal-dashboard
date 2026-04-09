@@ -33,15 +33,10 @@ const STATE_LABELS: Record<string, string> = {
   IL: 'Illinois',
 };
 
-const CLEARINGHOUSE_URLS: Record<string, string> = {
-  DC: 'https://liheapch.acf.gov/profiles/DC.htm',
-  MA: 'https://liheapch.acf.gov/profiles/Mass.htm',
-  IL: 'https://liheapch.acf.gov/profiles/Illinois.htm',
-};
-
-const SOURCE_URLS = {
-  allocations: 'https://acf.gov/sites/default/files/documents/ocs/Table-Allocations-States-11-20-2025.pdf',
-  avgBenefits: 'https://www.acf.hhs.gov/sites/default/files/documents/ocs/RPT_LIHEAP_RTC07TblAvgBenefitsFNs_FY2022-compliant.pdf',
+const STATE_PROFILE_URLS: Record<string, string> = {
+  DC: 'https://liheappm.acf.gov/sites/default/files/private/congress/profiles/2024/FY2024_DistrictofColumbia_Profile.pdf',
+  MA: 'https://liheappm.acf.gov/sites/default/files/private/congress/profiles/2024/FY2024_Massachusetts_Profile.pdf',
+  IL: 'https://liheappm.acf.gov/sites/default/files/private/congress/profiles/2024/FY2024_Illinois_Profile.pdf',
 };
 
 interface StateData {
@@ -64,9 +59,9 @@ interface StateData {
     model_recipients: number;
     model_total_spending: number;
     model_avg_benefit: number;
-    actual_heating_hh_fy24: number;
-    actual_allocation_fy26: number;
-    actual_avg_benefit_fy22: number;
+    actual_heating_hh: number;
+    actual_heating_spending: number;
+    actual_avg_benefit: number;
   };
 }
 
@@ -254,37 +249,25 @@ export default function AggregateImpact() {
                 <p>Recipients</p>
                 <p className="font-semibold">{Math.round(data.validation.model_recipients).toLocaleString()} model</p>
                 <p className="text-gray-400">
-                  {data.validation.actual_heating_hh_fy24.toLocaleString()} actual (FY24)
+                  {data.validation.actual_heating_hh.toLocaleString()} actual (FY24)
                 </p>
               </div>
               <div>
                 <p>Total spending</p>
                 <p className="font-semibold">{formatBillions(-data.validation.model_total_spending)} model</p>
-                <p className="text-gray-400">${(data.validation.actual_allocation_fy26 / 1e6).toFixed(1)}M actual (FY26)</p>
+                <p className="text-gray-400">${(data.validation.actual_heating_spending / 1e6).toFixed(1)}M actual (FY24)</p>
               </div>
               <div>
                 <p>Avg benefit</p>
                 <p className="font-semibold">${Math.round(data.validation.model_avg_benefit)} model</p>
-                <p className="text-gray-400">${data.validation.actual_avg_benefit_fy22} actual (FY22)</p>
+                <p className="text-gray-400">${data.validation.actual_avg_benefit} actual (FY24)</p>
               </div>
             </div>
             <div className="mt-3 pt-3 border-t border-gray-200 text-xs text-gray-400 space-y-1">
               <p>
-                Recipients (FY24):{' '}
-                <a href={CLEARINGHOUSE_URLS[selectedState]} target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">
-                  LIHEAP Clearinghouse {selectedState} profile
-                </a>
-              </p>
-              <p>
-                Allocation (FY26):{' '}
-                <a href={SOURCE_URLS.allocations} target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">
-                  ACF FY2026 State Allocations Table
-                </a>
-              </p>
-              <p>
-                Avg benefit (FY22):{' '}
-                <a href={SOURCE_URLS.avgBenefits} target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">
-                  LIHEAP FY2022 Report to Congress, Table III-5a
+                All actuals (FY24):{' '}
+                <a href={STATE_PROFILE_URLS[selectedState]} target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">
+                  ACF LIHEAP FY2024 {selectedState} State Profile
                 </a>
               </p>
             </div>

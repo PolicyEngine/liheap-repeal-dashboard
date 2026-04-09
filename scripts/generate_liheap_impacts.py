@@ -20,23 +20,25 @@ OUTPUT_DIR = Path(__file__).parent.parent / "frontend" / "public" / "data"
 STATES = {
     "DC": {
         "dataset": "hf://policyengine/policyengine-us-data/states/DC.h5",
-        "actual_heating_hh_fy24": 6891,
-        "actual_allocation_fy26": 11368742,
-        "actual_avg_benefit_fy22": 580,
+        "actual_heating_hh": 6891,
+        "actual_heating_spending": 7677745,
+        "actual_avg_benefit": 912,
     },
     "MA": {
         "dataset": "hf://policyengine/policyengine-us-data/states/MA.h5",
-        "actual_heating_hh_fy24": 150047,
-        "actual_allocation_fy26": 146098612,
-        "actual_avg_benefit_fy22": 1344,
+        "actual_heating_hh": 150047,
+        "actual_heating_spending": 124365554,
+        "actual_avg_benefit": 1184,
     },
     "IL": {
         "dataset": "hf://policyengine/policyengine-us-data/states/IL.h5",
-        "actual_heating_hh_fy24": 205143,
-        "actual_allocation_fy26": 180050062,
-        "actual_avg_benefit_fy22": 940,
+        "actual_heating_hh": 205143,
+        "actual_heating_spending": 127485768,
+        "actual_avg_benefit": 587,
     },
 }
+# Actual data source: ACF LIHEAP FY2024 State Profiles (heating assistance only)
+# https://liheappm.acf.gov/sites/default/files/private/congress/profiles/2024/
 
 _INTRA_BOUNDS = [-np.inf, -0.05, -1e-3, 1e-3, 0.05, np.inf]
 _INTRA_KEYS = [
@@ -318,9 +320,9 @@ def calculate_state_impact(state, config):
             "model_recipients": affected_count,
             "model_total_spending": abs(total_income_change),
             "model_avg_benefit": abs(avg_loss),
-            "actual_heating_hh_fy24": config["actual_heating_hh_fy24"],
-            "actual_allocation_fy26": config["actual_allocation_fy26"],
-            "actual_avg_benefit_fy22": config["actual_avg_benefit_fy22"],
+            "actual_heating_hh": config["actual_heating_hh"],
+            "actual_heating_spending": config["actual_heating_spending"],
+            "actual_avg_benefit": config["actual_avg_benefit"],
         },
     }
 
@@ -363,7 +365,7 @@ def main():
         print(f"    Affected households: {data['affected_households']:,.0f}")
         print(f"    Average loss: ${abs(data['avg_loss']):,.0f}")
         print(f"    Poverty: {pov['baseline']:.2f}% -> {pov['reform']:.2f}%")
-        print(f"    Model vs actual recipients: {v['model_recipients']:,.0f} vs {v['actual_heating_hh_fy24']:,}")
+        print(f"    Model vs actual recipients: {v['model_recipients']:,.0f} vs {v['actual_heating_hh']:,}")
 
     # Save combined results
     filepath = OUTPUT_DIR / "aggregate_impact.json"
