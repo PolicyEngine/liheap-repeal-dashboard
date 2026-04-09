@@ -2,6 +2,7 @@
 
 import Header from '@/components/Header';
 import PolicyOverview from '@/components/PolicyOverview';
+import HouseholdCalculator from '@/components/HouseholdCalculator';
 import AggregateImpact from '@/components/AggregateImpact';
 import Footer from '@/components/Footer';
 
@@ -11,6 +12,7 @@ export default function Home() {
       <Header />
       <main className="flex-1 max-w-5xl mx-auto w-full px-4 sm:px-6 py-8 space-y-12">
         <PolicyOverview />
+        <HouseholdCalculator />
         <AggregateImpact />
       </main>
       <Footer />
