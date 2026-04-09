@@ -77,7 +77,7 @@ const OUTPUT_VARS: Record<string, {
     extras: [
       { label: 'Benefit Level', var: 'ma_liheap_benefit_level', format: 'int' },
       { label: 'Standard Payment', var: 'ma_liheap_standard_payment', format: 'dollar' },
-      { label: 'HECS Payment', var: 'ma_liheap_hecs_payment', format: 'dollar' },
+      { label: 'HECS (High Energy Cost Supplement)', var: 'ma_liheap_hecs_payment', format: 'dollar' },
     ],
   },
   IL: {
@@ -100,6 +100,7 @@ function buildHousehold(
   rent: number,
   dcHousingType: string,
   receivesHousingAssistance: boolean,
+  heatingExpenseLastYear: number,
 ) {
   const year = 2024;
   const people: Record<string, Record<string, Record<number, number | boolean | null>>> = {};
@@ -148,6 +149,10 @@ function buildHousehold(
     spmInputs['receives_housing_assistance'] = { [year]: true };
   }
 
+  if (heatingExpenseLastYear > 0) {
+    spmInputs['heating_expense_last_year'] = { [year]: heatingExpenseLastYear };
+  }
+
   // Add output variables as null to request computation
   const vars = OUTPUT_VARS[state];
   const outputVarNames = [vars.eligible, vars.payment, ...vars.extras.map(e => e.var)];
@@ -192,10 +197,12 @@ export default function HouseholdCalculator() {
   const [rent, setRent] = useState(0);
   const [dcHousingType, setDcHousingType] = useState('MULTI_FAMILY');
   const [receivesHousingAssistance, setReceivesHousingAssistance] = useState(false);
+  const [heatingExpenseLastYear, setHeatingExpenseLastYear] = useState(0);
 
   const [result, setResult] = useState<Result | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showMethodology, setShowMethodology] = useState(false);
 
   const isHeatInRent =
     heatingSource === 'HEAT_IN_RENT' || heatingSource === 'CASH';
@@ -215,7 +222,7 @@ export default function HouseholdCalculator() {
       const household = buildHousehold(
         state, nAdults, nChildren, income,
         heatingSource, heatingExpense, rent,
-        dcHousingType, receivesHousingAssistance,
+        dcHousingType, receivesHousingAssistance, heatingExpenseLastYear,
       );
 
       const res = await fetch(`${API_URL}/us/calculate`, {
@@ -368,23 +375,27 @@ export default function HouseholdCalculator() {
                 </select>
               </div>
 
-              {/* Heating expense (hidden for heat-in-rent) */}
-              {!isHeatInRent && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Annual Heating Expense
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$</span>
-                    <input
-                      type="number"
-                      value={heatingExpense}
-                      onChange={e => setHeatingExpense(Number(e.target.value))}
-                      className="w-full rounded-md border border-gray-300 pl-7 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                    />
-                  </div>
+              {/* Heating expense (disabled for heat-in-rent) */}
+              <div>
+                <label className={`block text-sm font-medium mb-1 ${isHeatInRent ? 'text-gray-400' : 'text-gray-700'}`}>
+                  Annual Heating Expense
+                </label>
+                <div className="relative">
+                  <span className={`absolute left-3 top-1/2 -translate-y-1/2 text-sm ${isHeatInRent ? 'text-gray-300' : 'text-gray-500'}`}>$</span>
+                  <input
+                    type="number"
+                    value={isHeatInRent ? '' : heatingExpense}
+                    onChange={e => setHeatingExpense(Number(e.target.value))}
+                    disabled={isHeatInRent}
+                    placeholder={isHeatInRent ? 'Included in rent' : ''}
+                    className={`w-full rounded-md border pl-7 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 ${
+                      isHeatInRent
+                        ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
+                        : 'border-gray-300 bg-white'
+                    }`}
+                  />
                 </div>
-              )}
+              </div>
 
               {/* Rent (shown for heat-in-rent or IL) */}
               {(isHeatInRent || state === 'IL') && (
@@ -412,7 +423,18 @@ export default function HouseholdCalculator() {
               {/* DC housing type */}
               {state === 'DC' && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Housing Type</label>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <label className="block text-sm font-medium text-gray-700">Housing Type</label>
+                    <div className="relative group">
+                      <svg className="w-4 h-4 text-gray-400 cursor-help" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                      </svg>
+                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-3 bg-gray-800 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
+                        <p>&quot;Multifamily usually means apartments.&quot; — <a href="https://doee.dc.gov/sites/default/files/dc/sites/doee/service_content/attachments/DOEE%20FY24%20LIHEAP_REGULAR_Benefits_Table-Matrix.pdf" target="_blank" rel="noopener noreferrer" className="underline text-primary-200">DOEE FY24 Benefits Table</a></p>
+                        <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-800" />
+                      </div>
+                    </div>
+                  </div>
                   <select
                     value={dcHousingType}
                     onChange={e => setDcHousingType(e.target.value)}
@@ -426,18 +448,38 @@ export default function HouseholdCalculator() {
 
               {/* MA subsidized housing */}
               {state === 'MA' && (
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id="housing-assistance"
-                    checked={receivesHousingAssistance}
-                    onChange={e => setReceivesHousingAssistance(e.target.checked)}
-                    className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                  />
-                  <label htmlFor="housing-assistance" className="text-sm text-gray-700">
-                    Receives housing assistance (e.g., Section 8)
-                  </label>
-                </div>
+                <>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="housing-assistance"
+                      checked={receivesHousingAssistance}
+                      onChange={e => setReceivesHousingAssistance(e.target.checked)}
+                      className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                    />
+                    <label htmlFor="housing-assistance" className="text-sm text-gray-700">
+                      Receives housing assistance (e.g., Section 8)
+                    </label>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Prior-Year Heating Expense
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$</span>
+                      <input
+                        type="number"
+                        value={heatingExpenseLastYear || ''}
+                        onChange={e => setHeatingExpenseLastYear(Number(e.target.value))}
+                        placeholder="0"
+                        className="w-full rounded-md border border-gray-300 pl-7 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      />
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Used for HECS (High Energy Cost Supplement) eligibility. Enter last year&apos;s total heating cost. Leave blank or $0 if unknown.
+                    </p>
+                  </div>
+                </>
               )}
 
               {/* Calculate button */}
@@ -483,7 +525,7 @@ export default function HouseholdCalculator() {
                         ${result.payment.toLocaleString('en-US', { maximumFractionDigits: 0 })}
                       </p>
                       <p className="text-xs text-gray-400 mt-1">
-                        ${(result.payment / 12).toLocaleString('en-US', { maximumFractionDigits: 0 })}/month
+                        One-time seasonal payment
                       </p>
                     </div>
                   )}
@@ -522,6 +564,41 @@ export default function HouseholdCalculator() {
                 </div>
               )}
             </div>
+          </div>
+
+          {/* Methodology */}
+          <div className="mt-6 border border-gray-200 rounded-lg overflow-hidden">
+            <button onClick={() => setShowMethodology(!showMethodology)}
+              className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors text-left">
+              <span className="text-sm font-semibold text-gray-700">Methodology</span>
+              <span className="text-gray-400 text-xs">{showMethodology ? 'Hide' : 'Show details'}</span>
+            </button>
+            {showMethodology && (
+              <div className="px-4 py-4 text-sm text-gray-700 space-y-3 border-t border-gray-200 bg-white">
+                <h4 className="font-semibold text-gray-900">How this calculator works</h4>
+                <p>This calculator sends your household details to the <a href="https://policyengine.org" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">PolicyEngine API</a>, which runs the full LIHEAP eligibility and payment model for the selected state.</p>
+                <ul className="list-disc ml-5 space-y-1.5 text-gray-600">
+                  <li><strong>API:</strong> Calls <code className="bg-gray-100 px-1 rounded text-xs">api.policyengine.org/us/calculate</code> with a single-household situation. No data leaves your browser except to this API.</li>
+                  <li><strong>Income concept:</strong> The amount you enter represents your <em>total household income</em> from all members combined — this matches how LIHEAP applications work in practice. The model sums <code className="bg-gray-100 px-1 rounded text-xs">irs_gross_income</code> across all SPM unit members for eligibility. The income threshold is 60% of State Median Income (DC, IL) or state-specific FPG-based limits (MA).</li>
+                  <li><strong>Heating expense mapping:</strong> Your selected heating source determines which expense variable is set (e.g., Electricity → <code className="bg-gray-100 px-1 rounded text-xs">{state === 'DC' ? 'pre_subsidy_electricity_expense' : 'electricity_expense'}</code>, Gas → <code className="bg-gray-100 px-1 rounded text-xs">gas_expense</code>, Oil → <code className="bg-gray-100 px-1 rounded text-xs">fuel_oil_expense</code>). Benefits are capped at actual heating expenses (except heat-in-rent).</li>
+                  <li><strong>Household size:</strong> Modeled as an SPM unit. Household size affects both income thresholds and payment amounts.</li>
+                  {state === 'DC' && (
+                    <li><strong>DC payment model:</strong> Uses a payment matrix by heating type (electricity, gas, oil, heat-in-rent), housing type (single/multi-family), income level (10 levels at $2,000 increments), and household size (capped at 4). Source: <a href="https://doee.dc.gov/sites/default/files/dc/sites/doee/service_content/attachments/DOEE%20FY24%20LIHEAP_REGULAR_Benefits_Table-Matrix.pdf" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">DOEE FY24 Benefits Table</a>.</li>
+                  )}
+                  {state === 'MA' && (
+                    <>
+                      <li><strong>MA payment model:</strong> Uses 6 benefit levels based on income as % of Federal Poverty Guidelines, with separate payment tables for utility vs. deliverable fuel and subsidized vs. non-subsidized housing. Source: <a href="https://www.mass.gov/doc/fy-2025-heap-income-eligibility-benefit-chart-may-8-2025/download" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">FY2025 HEAP Benefit Chart</a>.</li>
+                      <li><strong>HECS:</strong> The High Energy Cost Supplement is an additional payment for households whose prior-year heating costs exceed a threshold. Set &quot;heating expense last year&quot; if applicable (not yet exposed in the form — uses default of $0).</li>
+                    </>
+                  )}
+                  {state === 'IL' && (
+                    <li><strong>IL payment model:</strong> Uses a 96-cell benefit matrix: 4 income brackets (0-50%, 51-100%, 101-150%, 151-200% FPL) x 4 fuel types x 6 household sizes. Fuel type is inferred from which expense variable has a value. Source: <a href="https://liheapch.acf.gov/docs/2024/benefits-matricies/IL_BenefitMatrix_2024.pdf#page=1" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">IL LIHEAP FY2024 Benefit Matrix</a>.</li>
+                  )}
+                  <li><strong>API version:</strong> Results depend on the version of <code className="bg-gray-100 px-1 rounded text-xs">policyengine-us</code> deployed to the API. Currently v1.633.1. IL benefit matrix (PR #7963) and MA expense cap fix are pending release.</li>
+                  <li><strong>Limitations:</strong> This is an estimate. Actual LIHEAP benefits may differ due to: additional eligibility factors not modeled (utility account verification, citizenship documentation), state-specific income definitions, administrative discretion, and funding availability.</li>
+                </ul>
+              </div>
+            )}
           </div>
         </div>
       )}
