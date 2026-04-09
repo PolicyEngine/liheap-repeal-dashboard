@@ -117,6 +117,7 @@ export default function AggregateImpact() {
   const [dataSource, setDataSource] = useState<'survey' | 'model' | 'model_imputed_raw' | 'model_imputed_derived'>('survey');
   const [activeSection, setActiveSection] = useState<'fiscal' | 'distributional' | 'winners' | 'poverty'>('fiscal');
   const [distMode, setDistMode] = useState<'relative' | 'absolute'>('relative');
+  const [showMethodology, setShowMethodology] = useState(false);
 
   useEffect(() => {
     async function loadData() {
@@ -218,23 +219,94 @@ export default function AggregateImpact() {
         ))}
       </div>
 
-      {/* Info banner with assumptions */}
-      {isModel && (
-        <div className="text-xs text-gray-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 space-y-1">
-          <p className="font-medium text-amber-800">
-            {modelMeta?.description || 'PolicyEngine modeled — heating assistance only'}
-          </p>
-          {data.takeup_rate && (
-            <p>Uses <code className="text-amber-700">{data.variable}</code> with {(data.takeup_rate * 100).toFixed(1)}% takeup rate.</p>
-          )}
-          {modelMeta?.assumptions && (
-            <p className="text-gray-500">Assumptions: {modelMeta.assumptions}</p>
-          )}
-          <p className="text-gray-400">
-            Actuals from <a href={STATE_PROFILE_URLS[selectedState]} target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">ACF LIHEAP FY2024 State Profile</a> (heating only).
-          </p>
-        </div>
-      )}
+      {/* Methodology section */}
+      <div className="border border-gray-200 rounded-lg overflow-hidden">
+        <button onClick={() => setShowMethodology(!showMethodology)}
+          className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors text-left">
+          <span className="text-sm font-semibold text-gray-700">Methodology</span>
+          <span className="text-gray-400 text-xs">{showMethodology ? 'Hide' : 'Show details'}</span>
+        </button>
+        {showMethodology && (
+          <div className="px-4 py-4 text-sm text-gray-700 space-y-3 border-t border-gray-200 bg-white">
+            {dataSource === 'survey' && (
+              <>
+                <h4 className="font-semibold text-gray-900">CPS Survey Reported</h4>
+                <p>Uses the <code className="bg-gray-100 px-1 rounded text-xs">spm_unit_energy_subsidy_reported</code> variable from the Current Population Survey (CPS) Annual Social and Economic Supplement (ASEC).</p>
+                <ul className="list-disc ml-5 space-y-1.5 text-gray-600">
+                  <li><strong>Data source:</strong> CPS ASEC microdata, processed by PolicyEngine into state-level .h5 files hosted on HuggingFace.</li>
+                  <li><strong>What it captures:</strong> Self-reported energy assistance received by each SPM unit. This includes <em>all</em> energy assistance types (heating, cooling, crisis) — not just LIHEAP heating.</li>
+                  <li><strong>Weighting:</strong> Survey weights from CPS, calibrated by PolicyEngine to match state-level demographic targets.</li>
+                  <li><strong>Baseline ({baselineYear}):</strong> Energy subsidy values as reported in the CPS. LIHEAP is active.</li>
+                  <li><strong>Repeal ({repealYear}):</strong> Energy subsidy set to $0 for all SPM units. Poverty and distributional impacts are computed from the difference.</li>
+                  <li><strong>Strengths:</strong> Captures actual program participation patterns; flows through the full poverty calculation chain (SPM thresholds, net income).</li>
+                  <li><strong>Limitations:</strong> CPS respondents systematically underreport program participation (e.g., MA shows 67% of actual recipients). No state LIHEAP formula used — purely survey-based.</li>
+                  <li><strong>Validation:</strong> Compared against total direct assistance (heating + cooling + crisis) from <a href={STATE_PROFILE_URLS[selectedState]} target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">ACF FY2024 State Profile</a>.</li>
+                </ul>
+              </>
+            )}
+            {dataSource === 'model' && (
+              <>
+                <h4 className="font-semibold text-gray-900">Model: HuggingFace Dataset + ACS Proxy Injection</h4>
+                <p>Computes LIHEAP heating benefits using PolicyEngine&apos;s state LIHEAP payment model (<code className="bg-gray-100 px-1 rounded text-xs">{data.variable}</code>), with ACS-derived household characteristics injected at runtime.</p>
+                <ul className="list-disc ml-5 space-y-1.5 text-gray-600">
+                  <li><strong>Data source:</strong> Standard state .h5 dataset from HuggingFace (<code className="text-xs">hf://policyengine/policyengine-us-data/states/{selectedState}.h5</code>). This is CPS-based and does <em>not</em> contain utility expense or heating fuel data.</li>
+                  <li><strong>ACS proxy injection:</strong> Before computing payments, the script injects ACS 2023 1-Year statistics via <code className="text-xs">sim.set_input()</code>:
+                    <ul className="list-disc ml-5 mt-1 space-y-1">
+                      <li><strong>Heat-in-rent rate:</strong> From ACS PUMS — percentage of renters whose primary heating fuel cost is included in rent (GASFP/ELEFP=1). Randomly assigned to renters using a fixed seed.</li>
+                      <li><strong>Heating fuel type:</strong> From ACS Table B25117 (Tenure by House Heating Fuel). Distribution of gas, electric, propane, oil by renter/owner status.</li>
+                      {selectedState === 'DC' && <li><strong>Housing type:</strong> From ACS Table B25032 (Tenure by Units in Structure). Single-family vs multi-family by renter/owner status.</li>}
+                    </ul>
+                  </li>
+                  <li><strong>Takeup rate:</strong> {((data.takeup_rate || 0) * 100).toFixed(1)}% — computed as FY2024 heating households served / state income-eligible population from the ACF State Profile.</li>
+                  <li><strong>Payment model:</strong> State-specific LIHEAP formula. {selectedState === 'DC' ? 'DC uses a payment matrix by heating type, housing type, income level (10 levels at $2,000 increments), and household size (1-4).' : selectedState === 'IL' ? 'IL uses a 96-cell benefit matrix: 4 income brackets (% FPL) x 4 fuel types x 6 household sizes. Source: IL LIHEAP FY2024 Benefit Matrix.' : 'MA uses a formula based on household size and income.'}</li>
+                  <li><strong>Strengths:</strong> Uses state-specific LIHEAP rules and payment schedules; ACS provides accurate fuel/housing distributions; best total spending match for DC (99.95%).</li>
+                  <li><strong>Limitations:</strong> ACS proxies are random assignments at the population level (not household-specific); eligible population count may differ from ACF estimates due to income concept differences.</li>
+                </ul>
+              </>
+            )}
+            {dataSource === 'model_imputed_raw' && (
+              <>
+                <h4 className="font-semibold text-gray-900">Model: Imputed Dataset (Raw)</h4>
+                <p>Uses a custom state .h5 dataset where utility expense variables have been imputed from ACS PUMS onto the CPS microdata. No additional injection at runtime.</p>
+                <ul className="list-disc ml-5 space-y-1.5 text-gray-600">
+                  <li><strong>Data source:</strong> <code className="text-xs">{selectedState}_with_utilities.h5</code> — built in policyengine-us-data by imputing ACS PUMS utility variables onto CPS households using statistical matching (income, household size, tenure, state).</li>
+                  <li><strong>Imputed variables:</strong>
+                    <ul className="list-disc ml-5 mt-1 space-y-1">
+                      <li><code className="text-xs">heat_expense_included_in_rent</code> — boolean, derived from ACS PUMS fuel cost flags (ELEFP=1 or GASFP=1 means included in rent)</li>
+                      <li><code className="text-xs">gas_expense</code>, <code className="text-xs">pre_subsidy_electricity_expense</code>, <code className="text-xs">fuel_oil_expense</code> — annual dollar amounts from ACS PUMS</li>
+                      <li><code className="text-xs">heating_cooling_expense</code> — sum of above</li>
+                    </ul>
+                  </li>
+                  <li><strong>No fuel type injection:</strong> The state LIHEAP fuel type variable (e.g., gas vs electric) is NOT set — it defaults to the model&apos;s default value. This typically underestimates payments because the default fuel type may have lower benefit amounts.</li>
+                  <li><strong>Takeup rate:</strong> Same {((data.takeup_rate || 0) * 100).toFixed(1)}% as other model approaches.</li>
+                  <li><strong>Strengths:</strong> Utility data is household-specific (not random population-level assignment); heat-in-rent is based on actual imputed expenses.</li>
+                  <li><strong>Limitations:</strong> Imputation may not perfectly reproduce state-level utility distributions; missing fuel type assignment leads to lower average benefits; imputed heat-in-rent rate may differ from PUMS-computed rate.</li>
+                </ul>
+              </>
+            )}
+            {dataSource === 'model_imputed_derived' && (
+              <>
+                <h4 className="font-semibold text-gray-900">Model: Imputed Dataset + Derived Fuel Type</h4>
+                <p>Same imputed dataset as above, but fuel type is derived from the imputed gas and electricity expenses at the household level.</p>
+                <ul className="list-disc ml-5 space-y-1.5 text-gray-600">
+                  <li><strong>Data source:</strong> Same <code className="text-xs">{selectedState}_with_utilities.h5</code> imputed dataset.</li>
+                  <li><strong>Fuel type derivation:</strong> For each household:
+                    <ul className="list-disc ml-5 mt-1 space-y-1">
+                      <li>If <code className="text-xs">heat_expense_included_in_rent = true</code> → {selectedState === 'IL' ? 'Cash (heat in rent)' : 'Heat in Rent'}</li>
+                      <li>If <code className="text-xs">gas_expense &gt; electricity_expense</code> → {selectedState === 'IL' ? 'Natural Gas / Other' : 'Gas'}</li>
+                      <li>Otherwise → {selectedState === 'IL' ? 'All Electric' : 'Electricity'}</li>
+                    </ul>
+                  </li>
+                  {selectedState === 'DC' && <li><strong>Housing type:</strong> Still uses ACS B25032 proxy injection (not available in imputed dataset).</li>}
+                  <li><strong>Takeup rate:</strong> Same {((data.takeup_rate || 0) * 100).toFixed(1)}% as other model approaches.</li>
+                  <li><strong>Strengths:</strong> Fuel type is household-specific based on actual imputed expenses (not random); combines best of imputation (heat-in-rent) with derived classification (fuel type).</li>
+                  <li><strong>Limitations:</strong> The gas vs electric classification may not match the actual primary heating fuel — a household can have high gas expense for cooking/water heating but heat with electricity. Imputed expense distributions may differ from ACS published tables.</li>
+                </ul>
+              </>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Level 3: Analysis tabs — underline tabs */}
       <div className="border-b border-gray-200 flex">
