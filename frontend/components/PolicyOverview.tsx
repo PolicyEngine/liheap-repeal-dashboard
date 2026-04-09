@@ -24,18 +24,18 @@ export default function PolicyOverview() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
         <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <p className="text-sm text-gray-500 mb-1">DC FY2026 Allocation</p>
-          <p className="text-xl font-bold text-gray-900">$11.4M</p>
+          <p className="text-sm text-gray-500 mb-1">DC FY2024 Heating Spending</p>
+          <p className="text-xl font-bold text-gray-900">$7.7M</p>
           <p className="text-xs text-gray-400">6,891 heating HH served (FY24)</p>
         </div>
         <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <p className="text-sm text-gray-500 mb-1">MA FY2026 Allocation</p>
-          <p className="text-xl font-bold text-gray-900">$146.1M</p>
+          <p className="text-sm text-gray-500 mb-1">MA FY2024 Heating Spending</p>
+          <p className="text-xl font-bold text-gray-900">$124.4M</p>
           <p className="text-xs text-gray-400">150,047 heating HH served (FY24)</p>
         </div>
         <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <p className="text-sm text-gray-500 mb-1">IL FY2026 Allocation</p>
-          <p className="text-xl font-bold text-gray-900">$180.1M</p>
+          <p className="text-sm text-gray-500 mb-1">IL FY2024 Heating Spending</p>
+          <p className="text-xl font-bold text-gray-900">$127.5M</p>
           <p className="text-xs text-gray-400">205,143 heating HH served (FY24)</p>
         </div>
       </div>
