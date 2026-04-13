@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import BenefitCharts from './BenefitCharts';
 
 const API_URL = 'https://api.policyengine.org';
 
@@ -514,6 +515,9 @@ export default function HouseholdCalculator() {
               )}
             </div>
           </div>
+
+          {/* Charts */}
+          <BenefitCharts state={state} />
 
           {/* Methodology */}
           <div className="mt-6 border border-gray-200 rounded-lg overflow-hidden">
