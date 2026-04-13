@@ -9,9 +9,9 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: 'LIHEAP Repeal Impact Dashboard',
+  title: 'LIHEAP Benefit Calculator',
   description:
-    'Explore the impact of repealing federal LIHEAP funding on households in DC, Massachusetts, and Illinois.',
+    'Estimate your LIHEAP eligibility and benefit amount for DC, Massachusetts, and Illinois.',
 };
 
 export default function RootLayout({

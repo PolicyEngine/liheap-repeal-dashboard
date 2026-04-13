@@ -14,7 +14,8 @@ import numpy as np
 from pathlib import Path
 from policyengine_us import Microsimulation
 
-YEAR = 2025
+BASELINE_YEAR = 2024
+REPEAL_YEAR = 2027
 OUTPUT_DIR = Path(__file__).parent.parent / "frontend" / "public" / "data"
 
 STATES = {
@@ -60,81 +61,119 @@ def _poverty_metrics(baseline_rate, reform_rate):
 
 
 def calculate_state_impact(state, config):
-    """Run microsimulation for one state and return impact data."""
+    """Run microsimulation for one state and return impact data.
+
+    Baseline year (2024): what LIHEAP looks like today.
+    Repeal year (2027): what happens if LIHEAP funding is zeroed out.
+    """
     dataset = config["dataset"]
 
-    # ===== BASELINE =====
-    print(f"  Loading baseline...")
+    # ===== BASELINE (2024) — current LIHEAP stats =====
+    print(f"  Loading baseline ({BASELINE_YEAR})...")
     baseline = Microsimulation(dataset=dataset)
 
-    energy_subsidy = baseline.calc(
-        "spm_unit_energy_subsidy_reported", period=YEAR
+    baseline_subsidy = baseline.calc(
+        "spm_unit_energy_subsidy_reported", period=BASELINE_YEAR
     )
-    energy_subsidy_hh = baseline.calc(
-        "spm_unit_energy_subsidy_reported", period=YEAR, map_to="household"
+    has_subsidy_baseline = baseline_subsidy > 1
+    baseline_recipients = float(has_subsidy_baseline.sum())
+    baseline_total_spending = float(baseline_subsidy.sum())
+    baseline_avg_benefit = (
+        baseline_total_spending / baseline_recipients
+        if baseline_recipients > 0
+        else 0.0
     )
 
-    income_change = -energy_subsidy_hh
+    # Also get repeal-year subsidy from baseline (what would exist without repeal)
+    repeal_subsidy = baseline.calc(
+        "spm_unit_energy_subsidy_reported", period=REPEAL_YEAR
+    )
+    repeal_subsidy_hh = baseline.calc(
+        "spm_unit_energy_subsidy_reported", period=REPEAL_YEAR, map_to="household"
+    )
+
+    has_subsidy_repeal = repeal_subsidy > 1
+    repeal_recipients = float(has_subsidy_repeal.sum())
+    repeal_total_spending = float(repeal_subsidy.sum())
+    repeal_avg_benefit = (
+        repeal_total_spending / repeal_recipients
+        if repeal_recipients > 0
+        else 0.0
+    )
+
+    income_change = -repeal_subsidy_hh
 
     baseline_net_income_raw = baseline.calc(
-        "household_net_income", period=YEAR
+        "household_net_income", period=REPEAL_YEAR
     )
-    baseline_net_income = baseline_net_income_raw + energy_subsidy_hh
+    baseline_net_income = baseline_net_income_raw + repeal_subsidy_hh
 
-    print(f"  Computing baseline poverty...")
+    print(f"  Computing baseline poverty ({REPEAL_YEAR})...")
     baseline_pov = baseline.calc(
-        "in_poverty", period=YEAR, map_to="person"
+        "in_poverty", period=REPEAL_YEAR, map_to="person"
     )
     baseline_deep_pov = baseline.calc(
-        "in_deep_poverty", period=YEAR, map_to="person"
+        "in_deep_poverty", period=REPEAL_YEAR, map_to="person"
     )
 
-    # Compute weighted poverty rates from MicroSeries BEFORE converting to numpy
     poverty_baseline_rate = float(baseline_pov.mean() * 100)
     deep_poverty_baseline_rate = float(baseline_deep_pov.mean() * 100)
 
     decile = baseline.calc(
-        "household_income_decile", period=YEAR, map_to="household"
+        "household_income_decile", period=REPEAL_YEAR, map_to="household"
     )
-    household_weight = baseline.calc("household_weight", period=YEAR)
     people_per_hh = baseline.calc(
-        "household_count_people", period=YEAR, map_to="household"
+        "household_count_people", period=REPEAL_YEAR, map_to="household"
     )
 
-    # Convert to numpy only for child poverty filtering
-    age_arr = np.array(baseline.calc("age", period=YEAR))
-    is_child = age_arr < 18
-    pw_arr = np.array(baseline.calc("person_weight", period=YEAR))
-    child_w = pw_arr[is_child]
-    total_child_w = child_w.sum()
+    is_child = baseline.calc("is_child", period=REPEAL_YEAR)
+    total_child_w = float(is_child.sum())
 
-    baseline_pov_arr = np.array(baseline_pov).astype(bool)
-    baseline_deep_pov_arr = np.array(baseline_deep_pov).astype(bool)
+    child_poverty_baseline_rate = (
+        float((baseline_pov * is_child).sum() / total_child_w * 100)
+        if total_child_w > 0
+        else 0.0
+    )
+    deep_child_poverty_baseline_rate = (
+        float((baseline_deep_pov * is_child).sum() / total_child_w * 100)
+        if total_child_w > 0
+        else 0.0
+    )
 
+    n_spm = len(repeal_subsidy)
     del baseline
 
-    # ===== REFORM =====
-    print(f"  Loading reform (LIHEAP repealed)...")
+    # ===== REFORM (2027) — LIHEAP repealed =====
+    print(f"  Loading reform ({REPEAL_YEAR}, LIHEAP repealed)...")
     reformed = Microsimulation(dataset=dataset)
-    n_spm = energy_subsidy.shape[0]
     reformed.set_input(
-        "spm_unit_energy_subsidy_reported", YEAR, np.zeros(n_spm)
+        "spm_unit_energy_subsidy_reported", REPEAL_YEAR, np.zeros(n_spm)
     )
 
     print(f"  Computing reform poverty...")
     reform_pov = reformed.calc(
-        "in_poverty", period=YEAR, map_to="person"
+        "in_poverty", period=REPEAL_YEAR, map_to="person"
     )
     reform_deep_pov = reformed.calc(
-        "in_deep_poverty", period=YEAR, map_to="person"
+        "in_deep_poverty", period=REPEAL_YEAR, map_to="person"
     )
 
-    # Compute weighted poverty rates from MicroSeries BEFORE converting to numpy
     poverty_reform_rate = float(reform_pov.mean() * 100)
     deep_poverty_reform_rate = float(reform_deep_pov.mean() * 100)
 
-    reform_pov_arr = np.array(reform_pov).astype(bool)
-    reform_deep_pov_arr = np.array(reform_deep_pov).astype(bool)
+    reform_is_child = reformed.calc("is_child", period=REPEAL_YEAR)
+    reform_total_child_w = float(reform_is_child.sum())
+
+    child_poverty_reform_rate = (
+        float((reform_pov * reform_is_child).sum() / reform_total_child_w * 100)
+        if reform_total_child_w > 0
+        else 0.0
+    )
+    deep_child_poverty_reform_rate = (
+        float((reform_deep_pov * reform_is_child).sum() / reform_total_child_w * 100)
+        if reform_total_child_w > 0
+        else 0.0
+    )
 
     del reformed
 
@@ -146,20 +185,11 @@ def calculate_state_impact(state, config):
     losers = float((income_change < -1).sum())
     winners = float((income_change > 1).sum())
 
-    affected_ms = (income_change < -1) | (income_change > 1)
-    affected_count = float(affected_ms.sum())
-
-    weight_arr = np.array(household_weight)
-    change_arr = np.array(income_change)
-    affected_mask = np.array(affected_ms).astype(bool)
+    affected = (income_change < -1) | (income_change > 1)
+    affected_count = float(affected.sum())
 
     avg_loss = (
-        float(
-            np.average(
-                change_arr[affected_mask],
-                weights=weight_arr[affected_mask],
-            )
-        )
+        float((income_change * affected).sum() / affected.sum())
         if affected_count > 0
         else 0.0
     )
@@ -168,22 +198,15 @@ def calculate_state_impact(state, config):
     winners_rate = winners / total_households * 100
 
     # ===== INCOME DECILE ANALYSIS =====
-    baseline_net_arr = np.array(baseline_net_income)
-    decile_arr = np.array(decile)
-
     decile_average = {}
     decile_relative = {}
     for d in range(1, 11):
-        dmask = decile_arr == d
-        d_count = float(weight_arr[dmask].sum())
+        dmask = decile == d
+        d_count = float(dmask.sum())
         if d_count > 0:
-            d_change_sum = float(
-                (change_arr[dmask] * weight_arr[dmask]).sum()
-            )
+            d_change_sum = float((income_change * dmask).sum())
             decile_average[str(d)] = d_change_sum / d_count
-            d_baseline_sum = float(
-                (baseline_net_arr[dmask] * weight_arr[dmask]).sum()
-            )
+            d_baseline_sum = float((baseline_net_income * dmask).sum())
             decile_relative[str(d)] = (
                 d_change_sum / d_baseline_sum if d_baseline_sum != 0 else 0.0
             )
@@ -191,24 +214,22 @@ def calculate_state_impact(state, config):
             decile_average[str(d)] = 0.0
             decile_relative[str(d)] = 0.0
 
-    # Intra-decile distribution
-    capped_baseline = np.maximum(baseline_net_arr, 1)
-    rel_change_arr = change_arr / capped_baseline
-    people_weighted = np.array(people_per_hh) * weight_arr
+    # Intra-decile distribution (people-weighted proportions)
+    capped_baseline = baseline_net_income.clip(lower=1)
+    rel_change = income_change / capped_baseline
 
     intra_decile_deciles = {key: [] for key in _INTRA_KEYS}
     for d in range(1, 11):
-        dmask = decile_arr == d
-        d_people = people_weighted[dmask]
-        d_total_people = d_people.sum()
-        d_rel = rel_change_arr[dmask]
+        dmask = decile == d
+        d_total_people = float((people_per_hh * dmask).sum())
 
         for lower, upper, key in zip(
             _INTRA_BOUNDS[:-1], _INTRA_BOUNDS[1:], _INTRA_KEYS
         ):
-            in_group = (d_rel > lower) & (d_rel <= upper)
+            bucket_mask = dmask & (rel_change > lower) & (rel_change <= upper)
+            bucket_people = float((people_per_hh * bucket_mask).sum())
             proportion = (
-                float(d_people[in_group].sum() / d_total_people)
+                bucket_people / d_total_people
                 if d_total_people > 0
                 else 0.0
             )
@@ -218,25 +239,7 @@ def calculate_state_impact(state, config):
         key: sum(intra_decile_deciles[key]) / 10 for key in _INTRA_KEYS
     }
 
-    # ===== POVERTY IMPACT =====
-    # Overall and deep rates already computed above from MicroSeries (.mean()).
-    # Only child rates need numpy + manual weighting for age filtering.
-    def _child_rate(arr):
-        return (
-            float((arr[is_child] * child_w).sum() / total_child_w * 100)
-            if total_child_w > 0
-            else 0.0
-        )
-
-    child_poverty_baseline_rate = _child_rate(baseline_pov_arr)
-    child_poverty_reform_rate = _child_rate(reform_pov_arr)
-
-    deep_child_poverty_baseline_rate = _child_rate(baseline_deep_pov_arr)
-    deep_child_poverty_reform_rate = _child_rate(reform_deep_pov_arr)
-
     # ===== INCOME BRACKET BREAKDOWN =====
-    agi_arr = baseline_net_arr
-
     income_brackets = [
         (0, 25_000, "Under $25k"),
         (25_000, 50_000, "$25k-$50k"),
@@ -248,19 +251,15 @@ def calculate_state_impact(state, config):
 
     by_income_bracket = []
     for min_inc, max_inc, label in income_brackets:
-        mask = (
-            (agi_arr >= min_inc)
-            & (agi_arr < max_inc)
-            & affected_mask
+        bracket_mask = (
+            (baseline_net_income >= min_inc)
+            & (baseline_net_income < max_inc)
+            & affected
         )
-        bracket_affected = float(weight_arr[mask].sum())
+        bracket_affected = float(bracket_mask.sum())
         if bracket_affected > 0:
-            bracket_cost = float(
-                (change_arr[mask] * weight_arr[mask]).sum()
-            )
-            bracket_avg = float(
-                np.average(change_arr[mask], weights=weight_arr[mask])
-            )
+            bracket_cost = float((income_change * bracket_mask).sum())
+            bracket_avg = bracket_cost / bracket_affected
         else:
             bracket_cost = 0.0
             bracket_avg = 0.0
@@ -316,59 +315,67 @@ def calculate_state_impact(state, config):
             },
         },
         "by_income_bracket": by_income_bracket,
-        "validation": {
-            "model_recipients": affected_count,
-            "model_total_spending": abs(total_income_change),
-            "model_avg_benefit": abs(avg_loss),
-            "actual_heating_hh": config["actual_heating_hh"],
-            "actual_heating_spending": config["actual_heating_spending"],
-            "actual_avg_benefit": config["actual_avg_benefit"],
+        "baseline_stats": {
+            "year": BASELINE_YEAR,
+            "recipients": baseline_recipients,
+            "total_spending": baseline_total_spending,
+            "avg_benefit": baseline_avg_benefit,
+        },
+        "repeal_stats": {
+            "year": REPEAL_YEAR,
+            "recipients": repeal_recipients,
+            "total_spending": repeal_total_spending,
+            "avg_benefit": repeal_avg_benefit,
         },
     }
 
 
 def main():
     print("=" * 60)
-    print("LIHEAP Repeal — Aggregate Impact Analysis (DC, MA, IL)")
+    print("LIHEAP Repeal — CPS Survey Impact Analysis (DC, MA, IL)")
     print("=" * 60)
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    filepath = OUTPUT_DIR / "aggregate_impact.json"
 
-    all_results = {
-        "meta": {
-            "year": YEAR,
-            "policy": "Federal LIHEAP repeal",
-            "variable": "spm_unit_energy_subsidy_reported",
-            "states": list(STATES.keys()),
-            "notes": (
-                "Uses CPS/SPM self-reported energy assistance data. "
-                "spm_unit_energy_subsidy is in spm_unit_benefits (poverty path) "
-                "but not in household_benefits (household_net_income path). "
-                "Income change computed directly from subsidy variable."
-            ),
-        },
-        "states": {},
-    }
+    # Load existing JSON to preserve model data
+    if filepath.exists():
+        with open(filepath) as f:
+            all_results = json.load(f)
+        print(f"Loaded existing {filepath} — will update survey data only.")
+    else:
+        all_results = {
+            "meta": {
+                "baseline_year": BASELINE_YEAR,
+                "repeal_year": REPEAL_YEAR,
+                "policy": "Federal LIHEAP repeal",
+                "states": list(STATES.keys()),
+            },
+            "states": {},
+        }
 
     for state, config in STATES.items():
         print(f"\n{'─' * 40}")
         print(f"Processing {state}...")
         print(f"{'─' * 40}")
-        data = calculate_state_impact(state, config)
-        all_results["states"][state] = data
+        survey_data = calculate_state_impact(state, config)
+
+        # Merge: update survey key, preserve everything else
+        if state not in all_results["states"]:
+            all_results["states"][state] = {}
+        all_results["states"][state]["survey"] = survey_data
 
         # Print summary
-        pov = data["poverty"]["poverty"]["all"]
-        v = data["validation"]
+        pov = survey_data["poverty"]["poverty"]["all"]
+        bs = survey_data["baseline_stats"]
         print(f"\n  {state} Summary:")
-        print(f"    Total LIHEAP loss: ${abs(data['total_cost']):,.0f}")
-        print(f"    Affected households: {data['affected_households']:,.0f}")
-        print(f"    Average loss: ${abs(data['avg_loss']):,.0f}")
+        print(f"    Total LIHEAP loss: ${abs(survey_data['total_cost']):,.0f}")
+        print(f"    Affected households: {survey_data['affected_households']:,.0f}")
+        print(f"    Average loss: ${abs(survey_data['avg_loss']):,.0f}")
+        print(f"    Recipients: {bs['recipients']:,.0f} estimated vs {config['actual_heating_hh']:,} actual")
         print(f"    Poverty: {pov['baseline']:.2f}% -> {pov['reform']:.2f}%")
-        print(f"    Model vs actual recipients: {v['model_recipients']:,.0f} vs {v['actual_heating_hh']:,}")
 
-    # Save combined results
-    filepath = OUTPUT_DIR / "aggregate_impact.json"
+    # Save
     with open(filepath, "w") as f:
         json.dump(all_results, f, indent=2)
     print(f"\nSaved: {filepath}")
@@ -382,7 +389,7 @@ def main():
     total_loss = 0
     total_affected = 0
     for state in STATES:
-        d = all_results["states"][state]
+        d = all_results["states"][state]["survey"]
         pov = d["poverty"]["poverty"]["all"]
         pov_change = pov["reform"] - pov["baseline"]
         print(

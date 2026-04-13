@@ -249,9 +249,10 @@ export default function AggregateImpact() {
                 <h4 className="font-semibold text-gray-900">Model: HuggingFace Dataset + ACS Proxy Injection</h4>
                 <p>Computes LIHEAP heating benefits using PolicyEngine&apos;s state LIHEAP payment model (<code className="bg-gray-100 px-1 rounded text-xs">{data.variable}</code>), with ACS-derived household characteristics injected at runtime.</p>
                 <ul className="list-disc ml-5 space-y-1.5 text-gray-600">
-                  <li><strong>Data source:</strong> Standard state .h5 dataset from HuggingFace (<code className="text-xs">hf://policyengine/policyengine-us-data/states/{selectedState}.h5</code>). This is CPS-based and does <em>not</em> contain utility expense or heating fuel data.</li>
+                  <li><strong>Data source:</strong> Standard state .h5 dataset from HuggingFace (<code className="text-xs">hf://policyengine/policyengine-us-data/states/{selectedState}.h5</code>). This is CPS-based and does <em>not</em> contain heating expense or heating fuel data.</li>
                   <li><strong>ACS proxy injection:</strong> Before computing payments, the script injects ACS 2023 1-Year statistics via <code className="text-xs">sim.set_input()</code>:
                     <ul className="list-disc ml-5 mt-1 space-y-1">
+                      <li><strong>Heating expense:</strong> <code className="text-xs">heating_expense_person</code> — annual heating cost per person, derived from ACS PUMS utility cost data.</li>
                       <li><strong>Heat-in-rent rate:</strong> From ACS PUMS — percentage of renters whose primary heating fuel cost is included in rent (GASFP/ELEFP=1). Randomly assigned to renters using a fixed seed.</li>
                       <li><strong>Heating fuel type:</strong> From ACS Table B25117 (Tenure by House Heating Fuel). Distribution of gas, electric, propane, oil by renter/owner status.</li>
                       {selectedState === 'DC' && <li><strong>Housing type:</strong> From ACS Table B25032 (Tenure by Units in Structure). Single-family vs multi-family by renter/owner status.</li>}
@@ -267,19 +268,18 @@ export default function AggregateImpact() {
             {dataSource === 'model_imputed_raw' && (
               <>
                 <h4 className="font-semibold text-gray-900">Model: Imputed Dataset (Raw)</h4>
-                <p>Uses a custom state .h5 dataset where utility expense variables have been imputed from ACS PUMS onto the CPS microdata. No additional injection at runtime.</p>
+                <p>Uses a custom state .h5 dataset where heating expense and heat-in-rent status have been imputed from ACS PUMS onto the CPS microdata. No additional injection at runtime.</p>
                 <ul className="list-disc ml-5 space-y-1.5 text-gray-600">
                   <li><strong>Data source:</strong> <code className="text-xs">{selectedState}_with_utilities.h5</code> — built in policyengine-us-data by imputing ACS PUMS utility variables onto CPS households using statistical matching (income, household size, tenure, state).</li>
                   <li><strong>Imputed variables:</strong>
                     <ul className="list-disc ml-5 mt-1 space-y-1">
+                      <li><code className="text-xs">heating_expense_person</code> — annual heating cost per person, derived from ACS PUMS utility cost data</li>
                       <li><code className="text-xs">heat_expense_included_in_rent</code> — boolean, derived from ACS PUMS fuel cost flags (ELEFP=1 or GASFP=1 means included in rent)</li>
-                      <li><code className="text-xs">gas_expense</code>, <code className="text-xs">pre_subsidy_electricity_expense</code>, <code className="text-xs">fuel_oil_expense</code> — annual dollar amounts from ACS PUMS</li>
-                      <li><code className="text-xs">heating_cooling_expense</code> — sum of above</li>
                     </ul>
                   </li>
-                  <li><strong>No fuel type injection:</strong> The state LIHEAP fuel type variable (e.g., gas vs electric) is NOT set — it defaults to the model&apos;s default value. This typically underestimates payments because the default fuel type may have lower benefit amounts.</li>
+                  <li><strong>No fuel type injection:</strong> The state LIHEAP heating type variable (e.g., gas vs electric) is NOT set — it defaults to the model&apos;s default value. This typically underestimates payments because the default fuel type may have lower benefit amounts.</li>
                   <li><strong>Takeup rate:</strong> Same {((data.takeup_rate || 0) * 100).toFixed(1)}% as other model approaches.</li>
-                  <li><strong>Strengths:</strong> Utility data is household-specific (not random population-level assignment); heat-in-rent is based on actual imputed expenses.</li>
+                  <li><strong>Strengths:</strong> Heating expense is household-specific (not random population-level assignment); heat-in-rent is based on actual imputed data.</li>
                   <li><strong>Limitations:</strong> Imputation may not perfectly reproduce state-level utility distributions; missing fuel type assignment leads to lower average benefits; imputed heat-in-rent rate may differ from PUMS-computed rate.</li>
                 </ul>
               </>
@@ -287,20 +287,21 @@ export default function AggregateImpact() {
             {dataSource === 'model_imputed_derived' && (
               <>
                 <h4 className="font-semibold text-gray-900">Model: Imputed Dataset + Derived Fuel Type</h4>
-                <p>Same imputed dataset as above, but fuel type is derived from the imputed gas and electricity expenses at the household level.</p>
+                <p>Same imputed dataset as above, but heating type is also derived and injected at the household level using ACS PUMS heating fuel data.</p>
                 <ul className="list-disc ml-5 space-y-1.5 text-gray-600">
                   <li><strong>Data source:</strong> Same <code className="text-xs">{selectedState}_with_utilities.h5</code> imputed dataset.</li>
-                  <li><strong>Fuel type derivation:</strong> For each household:
+                  <li><strong>Heating type derivation:</strong> For each household, the state heating type enum is set based on ACS PUMS primary heating fuel:
                     <ul className="list-disc ml-5 mt-1 space-y-1">
                       <li>If <code className="text-xs">heat_expense_included_in_rent = true</code> → {selectedState === 'IL' ? 'Cash (heat in rent)' : 'Heat in Rent'}</li>
-                      <li>If <code className="text-xs">gas_expense &gt; electricity_expense</code> → {selectedState === 'IL' ? 'Natural Gas / Other' : 'Gas'}</li>
-                      <li>Otherwise → {selectedState === 'IL' ? 'All Electric' : 'Electricity'}</li>
+                      <li>ACS primary heating fuel = utility gas → {selectedState === 'IL' ? 'Natural Gas / Other' : 'Gas'}</li>
+                      <li>ACS primary heating fuel = electricity → {selectedState === 'IL' ? 'All Electric' : 'Electricity'}</li>
+                      <li>ACS primary heating fuel = fuel oil/propane → {selectedState === 'IL' ? 'Propane / Fuel Oil' : selectedState === 'DC' ? 'Oil' : 'Heating Oil / Propane'}</li>
                     </ul>
                   </li>
                   {selectedState === 'DC' && <li><strong>Housing type:</strong> Still uses ACS B25032 proxy injection (not available in imputed dataset).</li>}
                   <li><strong>Takeup rate:</strong> Same {((data.takeup_rate || 0) * 100).toFixed(1)}% as other model approaches.</li>
-                  <li><strong>Strengths:</strong> Fuel type is household-specific based on actual imputed expenses (not random); combines best of imputation (heat-in-rent) with derived classification (fuel type).</li>
-                  <li><strong>Limitations:</strong> The gas vs electric classification may not match the actual primary heating fuel — a household can have high gas expense for cooking/water heating but heat with electricity. Imputed expense distributions may differ from ACS published tables.</li>
+                  <li><strong>Strengths:</strong> Both heating expense and heating type are household-specific based on imputed ACS data (not random population-level assignment).</li>
+                  <li><strong>Limitations:</strong> ACS primary heating fuel may not perfectly match what households report to LIHEAP; imputed expense distributions may differ from ACS published tables.</li>
                 </ul>
               </>
             )}
@@ -397,17 +398,17 @@ export default function AggregateImpact() {
             <div className="grid grid-cols-3 gap-4">
               <div>
                 <p>Recipients</p>
-                <p className="font-semibold">{Math.round(rs.recipients).toLocaleString()} model</p>
+                <p className="font-semibold">{Math.round(rs.recipients).toLocaleString()} estimated</p>
                 <p className="text-gray-400">{actualHH.toLocaleString()} actual (FY24)</p>
               </div>
               <div>
                 <p>Total spending</p>
-                <p className="font-semibold">${(rs.total_spending / 1e6).toFixed(1)}M model</p>
+                <p className="font-semibold">${(rs.total_spending / 1e6).toFixed(1)}M estimated</p>
                 <p className="text-gray-400">${(actualSpending / 1e6).toFixed(1)}M actual (FY24)</p>
               </div>
               <div>
                 <p>Avg benefit</p>
-                <p className="font-semibold">${Math.round(rs.avg_benefit)} model</p>
+                <p className="font-semibold">${Math.round(rs.avg_benefit)} estimated</p>
                 <p className="text-gray-400">${actualAvg} actual (FY24)</p>
               </div>
             </div>

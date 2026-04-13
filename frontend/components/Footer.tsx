@@ -7,15 +7,11 @@ export default function Footer() {
           <a href="https://policyengine.org" className="text-primary-600 hover:underline" target="_blank" rel="noopener noreferrer">
             PolicyEngine
           </a>
-          . Data from CPS/SPM self-reported energy assistance. Sources:{' '}
-          <a href="https://liheapch.acf.gov" className="text-primary-600 hover:underline" target="_blank" rel="noopener noreferrer">
-            LIHEAP Clearinghouse
-          </a>
-          ,{' '}
+          . Powered by the{' '}
           <a href="https://github.com/PolicyEngine/policyengine-us" className="text-primary-600 hover:underline" target="_blank" rel="noopener noreferrer">
             policyengine-us
-          </a>
-          .
+          </a>{' '}
+          microsimulation model.
         </p>
       </div>
     </footer>

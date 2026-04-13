@@ -27,36 +27,12 @@ const HEATING_SOURCES: Record<string, { label: string; value: string }[]> = {
   ],
   IL: [
     { label: 'All Electric', value: 'ALL_ELECTRIC' },
-    { label: 'Natural Gas', value: 'NAT_GAS' },
+    { label: 'Natural Gas', value: 'NAT_GAS_OTHER' },
     { label: 'Propane / Fuel Oil', value: 'PROPANE_FUEL_OIL' },
     { label: 'Heat included in rent', value: 'CASH' },
   ],
 };
 
-// Map heating source to the correct expense variable for the API
-function getExpenseVar(state: string, heatingSource: string): string | null {
-  if (heatingSource === 'HEAT_IN_RENT' || heatingSource === 'CASH') return null;
-  const map: Record<string, Record<string, string>> = {
-    DC: {
-      ELECTRICITY: 'pre_subsidy_electricity_expense',
-      GAS: 'gas_expense',
-      OIL: 'fuel_oil_expense',
-    },
-    MA: {
-      ELECTRICITY: 'electricity_expense',
-      NATURAL_GAS: 'gas_expense',
-      HEATING_OIL_AND_PROPANE: 'fuel_oil_expense',
-      KEROSENE: 'fuel_oil_expense',
-      OTHER: 'heating_cooling_expense',
-    },
-    IL: {
-      ALL_ELECTRIC: 'electricity_expense',
-      NAT_GAS: 'gas_expense',
-      PROPANE_FUEL_OIL: 'fuel_oil_expense',
-    },
-  };
-  return map[state]?.[heatingSource] ?? null;
-}
 
 // State-specific output variable names
 const OUTPUT_VARS: Record<string, {
@@ -134,15 +110,17 @@ function buildHousehold(
     spmInputs['dc_liheap_housing_type'] = { [year]: dcHousingType };
   } else if (state === 'MA') {
     spmInputs['ma_liheap_heating_type'] = { [year]: isHeatInRent ? 'ELECTRICITY' : heatingSource };
+  } else if (state === 'IL') {
+    spmInputs['il_liheap_heating_type'] = { [year]: heatingSource };
   }
 
   if (isHeatInRent) {
     spmInputs['heat_expense_included_in_rent'] = { [year]: true };
   }
 
-  const expenseVar = getExpenseVar(state, heatingSource);
-  if (expenseVar && heatingExpense > 0) {
-    spmInputs[expenseVar] = { [year]: heatingExpense };
+  // Set heating expense on the first adult (person-level variable).
+  if (!isHeatInRent && heatingExpense > 0) {
+    people['adult_1'].heating_expense_person = { [year]: heatingExpense };
   }
 
   if (receivesHousingAssistance) {
@@ -187,7 +165,6 @@ interface Result {
 }
 
 export default function HouseholdCalculator() {
-  const [open, setOpen] = useState(false);
   const [state, setState] = useState('DC');
   const [nAdults, setNAdults] = useState(1);
   const [nChildren, setNChildren] = useState(0);
@@ -271,36 +248,8 @@ export default function HouseholdCalculator() {
 
   return (
     <section id="calculator">
-      <button
-        onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between text-left px-6 py-5 rounded-lg border-2 border-primary-200 bg-primary-50 hover:bg-primary-100 transition-colors cursor-pointer"
-      >
-        <div className="flex items-center gap-3">
-          <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary-200 text-primary-700">
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 15.75V18m-7.5-6.75h.008v.008H8.25v-.008zm0 2.25h.008v.008H8.25v-.008zm0 2.25h.008v.008H8.25v-.008zm0 2.25h.008v.008H8.25v-.008zm2.25-4.5h.008v.008h-.008v-.008zm0 2.25h.008v.008h-.008v-.008zm0 2.25h.008v.008h-.008v-.008zm0 2.25h.008v.008h-.008v-.008zm2.25-4.5h.008v.008H12.75v-.008zm0 2.25h.008v.008H12.75v-.008zm0 2.25h.008v.008H12.75v-.008zm0 2.25h.008v.008H12.75v-.008zm2.25-6.75h.008v.008H15v-.008zm0 2.25h.008v.008H15v-.008zm0 2.25h.008v.008H15v-.008zM3.375 5.25c-.621 0-1.125.504-1.125 1.125v3.026a2.999 2.999 0 010 5.198v2.776c0 .621.504 1.125 1.125 1.125h17.25c.621 0 1.125-.504 1.125-1.125v-2.776a2.999 2.999 0 010-5.198V6.375c0-.621-.504-1.125-1.125-1.125H3.375z" />
-            </svg>
-          </div>
-          <div>
-            <h2 className="text-xl font-bold text-primary-800">
-              Household LIHEAP Calculator
-            </h2>
-            <p className="text-sm text-primary-600 mt-0.5">
-              {open ? 'Enter your household details below' : 'Click to estimate your LIHEAP eligibility and benefit'}
-            </p>
-          </div>
-        </div>
-        <svg
-          className={`w-5 h-5 text-primary-500 shrink-0 ml-4 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
-          fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
-
-      {open && (
-        <div className="mt-4 rounded-lg border border-gray-200 bg-white p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <div className="rounded-lg border border-gray-200 bg-white p-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {/* Input form */}
             <div className="space-y-5">
               {/* State */}
@@ -575,33 +524,23 @@ export default function HouseholdCalculator() {
             </button>
             {showMethodology && (
               <div className="px-4 py-4 text-sm text-gray-700 space-y-3 border-t border-gray-200 bg-white">
-                <h4 className="font-semibold text-gray-900">How this calculator works</h4>
-                <p>This calculator sends your household details to the <a href="https://policyengine.org" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">PolicyEngine API</a>, which runs the full LIHEAP eligibility and payment model for the selected state.</p>
                 <ul className="list-disc ml-5 space-y-1.5 text-gray-600">
-                  <li><strong>API:</strong> Calls <code className="bg-gray-100 px-1 rounded text-xs">api.policyengine.org/us/calculate</code> with a single-household situation. No data leaves your browser except to this API.</li>
-                  <li><strong>Income concept:</strong> The amount you enter represents your <em>total household income</em> from all members combined — this matches how LIHEAP applications work in practice. The model sums <code className="bg-gray-100 px-1 rounded text-xs">irs_gross_income</code> across all SPM unit members for eligibility. The income threshold is 60% of State Median Income (DC, IL) or state-specific FPG-based limits (MA).</li>
-                  <li><strong>Heating expense mapping:</strong> Your selected heating source determines which expense variable is set (e.g., Electricity → <code className="bg-gray-100 px-1 rounded text-xs">{state === 'DC' ? 'pre_subsidy_electricity_expense' : 'electricity_expense'}</code>, Gas → <code className="bg-gray-100 px-1 rounded text-xs">gas_expense</code>, Oil → <code className="bg-gray-100 px-1 rounded text-xs">fuel_oil_expense</code>). Benefits are capped at actual heating expenses (except heat-in-rent).</li>
-                  <li><strong>Household size:</strong> Modeled as an SPM unit. Household size affects both income thresholds and payment amounts.</li>
+                  <li><strong>Heating expense:</strong> Your heating source sets the state heating type enum, and your annual heating cost is passed as <code className="bg-gray-100 px-1 rounded text-xs">heating_expense_person</code>. Benefits are capped at actual heating expenses (except heat-in-rent, which bypasses the cap).</li>
                   {state === 'DC' && (
-                    <li><strong>DC payment model:</strong> Uses a payment matrix by heating type (electricity, gas, oil, heat-in-rent), housing type (single/multi-family), income level (10 levels at $2,000 increments), and household size (capped at 4). Source: <a href="https://doee.dc.gov/sites/default/files/dc/sites/doee/service_content/attachments/DOEE%20FY24%20LIHEAP_REGULAR_Benefits_Table-Matrix.pdf" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">DOEE FY24 Benefits Table</a>.</li>
+                    <li><strong>Payment:</strong> Matrix by heating type, housing type, income level, and household size. Source: <a href="https://doee.dc.gov/sites/default/files/dc/sites/doee/service_content/attachments/DOEE%20FY24%20LIHEAP_REGULAR_Benefits_Table-Matrix.pdf" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">DOEE FY24 Benefits Table</a>.</li>
                   )}
                   {state === 'MA' && (
-                    <>
-                      <li><strong>MA payment model:</strong> Uses 6 benefit levels based on income as % of Federal Poverty Guidelines, with separate payment tables for utility vs. deliverable fuel and subsidized vs. non-subsidized housing. Source: <a href="https://www.mass.gov/doc/fy-2025-heap-income-eligibility-benefit-chart-may-8-2025/download" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">FY2025 HEAP Benefit Chart</a>.</li>
-                      <li><strong>HECS:</strong> The High Energy Cost Supplement is an additional payment for households whose prior-year heating costs exceed a threshold. Set &quot;heating expense last year&quot; if applicable (not yet exposed in the form — uses default of $0).</li>
-                    </>
+                    <li><strong>Payment:</strong> 6 benefit levels by income as % of FPG, with separate tables for utility vs. deliverable fuel and subsidized vs. non-subsidized housing. HECS supplement available if prior-year heating costs exceed a threshold. Source: <a href="https://www.mass.gov/doc/fy-2025-heap-income-eligibility-benefit-chart-may-8-2025/download" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">FY2025 HEAP Benefit Chart</a>.</li>
                   )}
                   {state === 'IL' && (
-                    <li><strong>IL payment model:</strong> Uses a 96-cell benefit matrix: 4 income brackets (0-50%, 51-100%, 101-150%, 151-200% FPL) x 4 fuel types x 6 household sizes. Fuel type is inferred from which expense variable has a value. Source: <a href="https://liheapch.acf.gov/docs/2024/benefits-matricies/IL_BenefitMatrix_2024.pdf#page=1" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">IL LIHEAP FY2024 Benefit Matrix</a>.</li>
+                    <li><strong>Payment:</strong> 96-cell matrix: 4 income brackets x 4 fuel types x 6 household sizes. Source: <a href="https://liheapch.acf.gov/docs/2024/benefits-matricies/IL_BenefitMatrix_2024.pdf#page=1" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">IL LIHEAP FY2024 Benefit Matrix</a>.</li>
                   )}
-                  <li><strong>API version:</strong> Results depend on the version of <code className="bg-gray-100 px-1 rounded text-xs">policyengine-us</code> deployed to the API. Currently v1.633.1. IL benefit matrix (PR #7963) and MA expense cap fix are pending release.</li>
-                  <li><strong>Limitations:</strong> This is an estimate. Actual LIHEAP benefits may differ due to: additional eligibility factors not modeled (utility account verification, citizenship documentation), state-specific income definitions, administrative discretion, and funding availability.</li>
+                  <li><strong>Limitations:</strong> This is an estimate. Actual benefits may differ due to eligibility factors not modeled (utility account verification, citizenship documentation), state-specific income definitions, administrative discretion, and funding availability.</li>
                 </ul>
               </div>
             )}
           </div>
-        </div>
-      )}
+      </div>
     </section>
   );
 }
