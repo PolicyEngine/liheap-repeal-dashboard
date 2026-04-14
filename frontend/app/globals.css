@@ -17,3 +17,14 @@
 body {
   background-color: #fafbfc;
 }
+
+.field-input {
+  @apply rounded-md border border-gray-300 py-1.5 pr-3 pl-3 text-sm
+    focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500;
+  height: 38px;
+}
+
+/* Override left padding for dollar-prefixed inputs */
+.field-input-dollar {
+  padding-left: 1.75rem !important;
+}
