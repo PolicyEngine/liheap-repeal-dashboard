@@ -1,7 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Surface3DChart, IncomeLineChart } from './BenefitCharts';
+import type { LiheapData } from '@/lib/liheapData';
+import { fetchLiheapData } from '@/lib/liheapData';
 
 const API_URL = 'https://api.policyengine.org';
 
@@ -144,12 +146,22 @@ export default function HouseholdCalculator() {
   const [dcHousingType, setDcHousingType] = useState('MULTI_FAMILY');
   const [receivesHousingAssistance, setReceivesHousingAssistance] = useState(false);
   const [heatingExpenseLastYear, setHeatingExpenseLastYear] = useState(0);
-  const [chartExpense, setChartExpense] = useState(3000);
 
   const [result, setResult] = useState<Result | null>(null);
   const [hasCalculated, setHasCalculated] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [liheapData, setLiheapData] = useState<LiheapData | undefined>(undefined);
+  const metadataFetched = useRef(false);
+
+  // Fetch LIHEAP parameters from API metadata in the background on mount
+  useEffect(() => {
+    if (metadataFetched.current) return;
+    metadataFetched.current = true;
+    fetchLiheapData(API_URL)
+      .then(setLiheapData)
+      .catch((err) => console.warn('Failed to fetch live LIHEAP params, using defaults:', err));
+  }, []);
 
   const isHeatInRent = heatingSource === 'HEAT_IN_RENT' || heatingSource === 'CASH';
   const householdSize = nAdults + nChildren;
@@ -314,9 +326,9 @@ export default function HouseholdCalculator() {
           </div>
         </div>
       ) : (
-        <div className="flex-1 grid grid-cols-1 lg:grid-cols-5 gap-3 mt-3 min-h-0">
+        <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-3 mt-3 min-h-0">
           {/* Left: 3D Surface Chart */}
-          <div className="lg:col-span-3 rounded-lg border border-gray-200 bg-white p-3 flex flex-col min-h-0">
+          <div className="lg:col-span-2 rounded-lg border border-gray-200 bg-white p-3 flex flex-col min-h-0">
             <div className="flex items-center justify-between mb-1">
               <h4 className="text-xs font-semibold text-gray-700">Benefit Landscape</h4>
               <p className="text-[10px] text-gray-400">Drag to rotate, scroll to zoom</p>
@@ -328,12 +340,13 @@ export default function HouseholdCalculator() {
                 householdSize={householdSize}
                 housingType={dcHousingType}
                 subsidized={receivesHousingAssistance}
+                data={liheapData}
               />
             </div>
           </div>
 
           {/* Right: Result + Line Chart */}
-          <div className="lg:col-span-2 flex flex-col gap-3 min-h-0">
+          <div className="lg:col-span-1 flex flex-col gap-3 min-h-0">
             {/* Result card */}
             <div className="rounded-lg border border-gray-200 bg-white p-4">
               {error && (
@@ -383,15 +396,9 @@ export default function HouseholdCalculator() {
             <div className="flex-1 rounded-lg border border-gray-200 bg-white p-3 flex flex-col min-h-0">
               <div className="flex items-center justify-between mb-1">
                 <h4 className="text-xs font-semibold text-gray-700">Benefit by Income</h4>
-                <div className="flex items-center gap-1.5">
-                  <label className="text-[10px] text-gray-400">Expense:</label>
-                  <select value={chartExpense} onChange={e => setChartExpense(Number(e.target.value))}
-                    className="rounded border border-gray-200 px-2 py-0.5 text-xs text-gray-600 focus:outline-none focus:ring-1 focus:ring-primary-500">
-                    {[500, 1000, 1500, 2000, 3000, 5000].map(v => (
-                      <option key={v} value={v}>{fmt(v)}/yr</option>
-                    ))}
-                  </select>
-                </div>
+                <p className="text-[10px] text-gray-400">
+                  At {fmt(isHeatInRent ? 0 : heatingExpense)}/yr expense
+                </p>
               </div>
               <div className="flex-1 min-h-0">
                 <IncomeLineChart
@@ -399,7 +406,10 @@ export default function HouseholdCalculator() {
                   householdSize={householdSize}
                   housingType={dcHousingType}
                   subsidized={receivesHousingAssistance}
-                  chartExpense={chartExpense}
+                  chartExpense={isHeatInRent ? 99999 : heatingExpense}
+                  data={liheapData}
+                  highlightIncome={income}
+                  highlightHeatingType={heatingSource}
                 />
               </div>
             </div>

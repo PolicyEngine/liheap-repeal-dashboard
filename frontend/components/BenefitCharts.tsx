@@ -4,11 +4,13 @@ import { useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, Legend,
+  Tooltip, ResponsiveContainer, Legend, ReferenceDot,
 } from 'recharts';
+import type { LiheapData } from '@/lib/liheapData';
 import {
   generateSurface,
   generateIncomeLines,
+  computeBenefit,
   CHART_HEATING_TYPES,
 } from '@/lib/liheapData';
 
@@ -47,14 +49,15 @@ export interface ChartParams {
   householdSize: number;
   housingType: string;
   subsidized: boolean;
+  data?: LiheapData;
 }
 
 export function Surface3DChart({
-  state, heatingType, householdSize, housingType, subsidized, height = 360,
+  state, heatingType, householdSize, housingType, subsidized, data, height = 360,
 }: ChartParams & { height?: number }) {
   const surface = useMemo(
-    () => generateSurface({ state, heatingType, householdSize, housingType, subsidized, gridSize: 30 }),
-    [state, heatingType, householdSize, housingType, subsidized],
+    () => generateSurface({ state, heatingType, householdSize, housingType, subsidized, data, gridSize: 30 }),
+    [state, heatingType, householdSize, housingType, subsidized, data],
   );
 
   return (
@@ -106,14 +109,28 @@ export function Surface3DChart({
 }
 
 export function IncomeLineChart({
-  state, householdSize, housingType, subsidized, chartExpense,
-}: Omit<ChartParams, 'heatingType'> & { chartExpense: number }) {
+  state, householdSize, housingType, subsidized, data, chartExpense,
+  highlightIncome, highlightHeatingType,
+}: Omit<ChartParams, 'heatingType'> & {
+  chartExpense: number;
+  highlightIncome?: number;
+  highlightHeatingType?: string;
+}) {
   const types = CHART_HEATING_TYPES[state] || [];
 
   const lineData = useMemo(
-    () => generateIncomeLines({ state, householdSize, heatingExpense: chartExpense, housingType, subsidized }),
-    [state, householdSize, chartExpense, housingType, subsidized],
+    () => generateIncomeLines({ state, householdSize, heatingExpense: chartExpense, housingType, subsidized, data }),
+    [state, householdSize, chartExpense, housingType, subsidized, data],
   );
+
+  // Compute the highlighted point's benefit
+  const highlightBenefit = useMemo(() => {
+    if (highlightIncome == null || !highlightHeatingType) return null;
+    return computeBenefit({
+      state, heatingType: highlightHeatingType, income: highlightIncome,
+      heatingExpense: chartExpense, householdSize, housingType, subsidized,
+    }, data);
+  }, [state, highlightHeatingType, highlightIncome, chartExpense, householdSize, housingType, subsidized, data]);
 
   return (
     <ResponsiveContainer width="100%" height="100%">
@@ -162,6 +179,16 @@ export function IncomeLineChart({
             name={ht.value}
           />
         ))}
+        {highlightIncome != null && highlightBenefit != null && highlightHeatingType && (
+          <ReferenceDot
+            x={highlightIncome}
+            y={highlightBenefit}
+            r={5}
+            fill="#1D4044"
+            stroke="#fff"
+            strokeWidth={2}
+          />
+        )}
       </LineChart>
     </ResponsiveContainer>
   );
