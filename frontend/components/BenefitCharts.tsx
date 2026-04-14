@@ -49,7 +49,7 @@ export interface ChartParams {
   householdSize: number;
   housingType: string;
   subsidized: boolean;
-  data?: LiheapData;
+  data: LiheapData;
 }
 
 export function Surface3DChart({

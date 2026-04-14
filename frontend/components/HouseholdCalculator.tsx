@@ -334,14 +334,20 @@ export default function HouseholdCalculator() {
               <p className="text-[10px] text-gray-400">Drag to rotate, scroll to zoom</p>
             </div>
             <div className="flex-1 min-h-0">
-              <Surface3DChart
-                state={state}
-                heatingType={heatingSource}
-                householdSize={householdSize}
-                housingType={dcHousingType}
-                subsidized={receivesHousingAssistance}
-                data={liheapData}
-              />
+              {liheapData ? (
+                <Surface3DChart
+                  state={state}
+                  heatingType={heatingSource}
+                  householdSize={householdSize}
+                  housingType={dcHousingType}
+                  subsidized={receivesHousingAssistance}
+                  data={liheapData}
+                />
+              ) : (
+                <div className="flex items-center justify-center h-full">
+                  <p className="text-sm text-gray-400">Loading chart data...</p>
+                </div>
+              )}
             </div>
           </div>
 
@@ -401,16 +407,22 @@ export default function HouseholdCalculator() {
                 </p>
               </div>
               <div className="flex-1 min-h-0">
-                <IncomeLineChart
-                  state={state}
-                  householdSize={householdSize}
-                  housingType={dcHousingType}
-                  subsidized={receivesHousingAssistance}
-                  chartExpense={isHeatInRent ? 99999 : heatingExpense}
-                  data={liheapData}
-                  highlightIncome={income}
-                  highlightHeatingType={heatingSource}
-                />
+                {liheapData ? (
+                  <IncomeLineChart
+                    state={state}
+                    householdSize={householdSize}
+                    housingType={dcHousingType}
+                    subsidized={receivesHousingAssistance}
+                    chartExpense={isHeatInRent ? 99999 : heatingExpense}
+                    data={liheapData}
+                    highlightIncome={income}
+                    highlightHeatingType={heatingSource}
+                  />
+                ) : (
+                  <div className="flex items-center justify-center h-full">
+                    <p className="text-xs text-gray-400">Loading...</p>
+                  </div>
+                )}
               </div>
             </div>
           </div>

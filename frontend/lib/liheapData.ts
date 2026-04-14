@@ -42,77 +42,6 @@ export function getFPL(householdSize: number): number {
   return FPL_BASE + FPL_INCREMENT * (Math.max(1, householdSize) - 1);
 }
 
-// ===== Hardcoded defaults (FY2024 values) =====
-
-const DEFAULT_DATA: LiheapData = {
-  dc: {
-    incomeIncrement: 2000,
-    heatInRent: 250,
-    oil: 1500,
-    payment: {
-      ELECTRICITY: {
-        MULTI_FAMILY: [
-          [729, 857, 943, 1071], [694, 816, 898, 1020], [653, 768, 845, 960],
-          [632, 744, 818, 930], [469, 552, 607, 690], [449, 528, 581, 660],
-          [367, 432, 475, 540], [347, 408, 449, 510], [306, 360, 396, 450],
-          [250, 250, 250, 250],
-        ],
-        SINGLE_FAMILY: [
-          [948, 1116, 1227, 1394], [903, 1063, 1169, 1328], [850, 1000, 1100, 1250],
-          [823, 969, 1066, 1211], [611, 719, 791, 898], [584, 688, 756, 859],
-          [478, 563, 619, 703], [452, 531, 584, 664], [398, 469, 516, 586],
-          [250, 250, 250, 273],
-        ],
-      },
-      GAS: {
-        MULTI_FAMILY: [
-          [1045, 1229, 1290, 1536], [995, 1170, 1229, 1463], [918, 1080, 1134, 1350],
-          [842, 990, 1040, 1238], [765, 900, 945, 1125], [727, 855, 898, 1069],
-          [689, 810, 851, 1013], [650, 765, 803, 956], [574, 675, 709, 844],
-          [459, 540, 567, 675],
-        ],
-        SINGLE_FAMILY: [
-          [1277, 1502, 1577, 1800], [1216, 1430, 1502, 1788], [1122, 1320, 1386, 1650],
-          [1029, 1210, 1271, 1513], [935, 1100, 1155, 1375], [888, 1045, 1097, 1306],
-          [842, 990, 1040, 1238], [795, 935, 982, 1169], [701, 825, 866, 1031],
-          [561, 660, 693, 825],
-        ],
-      },
-    },
-  },
-  ma: {
-    standard: {
-      non_subsidized: [
-        [1025, 1500], [902, 1320], [794, 1162], [699, 1022], [699, 1022], [615, 900],
-      ],
-      subsidized: [
-        [718, 1050], [631, 924], [556, 813], [489, 716], [489, 716], [430, 630],
-      ],
-    },
-    hecs: [200, 180, 160, 140, 140, 120],
-  },
-  il: {
-    matrices: {
-      ALL_ELECTRIC: [
-        [840, 890, 940, 990, 1040, 1090], [530, 560, 620, 680, 720, 770],
-        [370, 390, 430, 470, 500, 540], [300, 320, 350, 380, 400, 440],
-      ],
-      NAT_GAS_OTHER: [
-        [1260, 1360, 1460, 1560, 1660, 1760], [610, 640, 690, 750, 790, 830],
-        [420, 450, 480, 520, 550, 570], [340, 380, 420, 470, 510, 550],
-      ],
-      PROPANE_FUEL_OIL: [
-        [1520, 1620, 1720, 1820, 1920, 2020], [710, 750, 820, 910, 950, 1010],
-        [490, 520, 570, 630, 660, 700], [340, 380, 420, 470, 510, 550],
-      ],
-      CASH: [
-        [630, 680, 730, 780, 830, 880], [305, 320, 345, 375, 395, 415],
-        [210, 225, 240, 260, 275, 285], [170, 190, 210, 235, 255, 275],
-      ],
-    },
-    bracketThresholds: [0, 0.51, 1.01, 1.51],
-  },
-};
 
 // ===== Parse live data from API metadata =====
 
@@ -124,20 +53,20 @@ function latestValue(values: Record<string, number>): number {
 
 /**
  * Parse the PolicyEngine /us/metadata response into LiheapData.
- * Falls back to defaults for any missing parameters.
+ * All values come from the API -- no hardcoded fallbacks.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function parseMetadata(params: Record<string, any>): LiheapData {
-  const get = (key: string): number | undefined => {
+  const get = (key: string): number => {
     const p = params[key];
-    if (!p?.values) return undefined;
+    if (!p?.values) return 0;
     return latestValue(p.values);
   };
 
   // ── DC ──
-  const dcIncrement = get('gov.states.dc.doee.liheap.income_level_increment') ?? DEFAULT_DATA.dc.incomeIncrement;
-  const dcHeatInRent = get('gov.states.dc.doee.liheap.payment.heat_in_rent') ?? DEFAULT_DATA.dc.heatInRent;
-  const dcOil = get('gov.states.dc.doee.liheap.payment.oil') ?? DEFAULT_DATA.dc.oil;
+  const dcIncrement = get('gov.states.dc.doee.liheap.income_level_increment');
+  const dcHeatInRent = get('gov.states.dc.doee.liheap.payment.heat_in_rent');
+  const dcOil = get('gov.states.dc.doee.liheap.payment.oil');
 
   const dcPayment: Record<string, Record<string, number[][]>> = {};
   for (const fuel of ['electricity', 'gas']) {
@@ -148,8 +77,7 @@ export function parseMetadata(params: Record<string, any>): LiheapData {
       for (let level = 1; level <= 10; level++) {
         const row: number[] = [];
         for (let size = 1; size <= 4; size++) {
-          const key = `gov.states.dc.doee.liheap.payment.${fuel}.${housing}.${level}.${size}`;
-          row.push(get(key) ?? DEFAULT_DATA.dc.payment[fuelKey]?.[housing]?.[level - 1]?.[size - 1] ?? 0);
+          row.push(get(`gov.states.dc.doee.liheap.payment.${fuel}.${housing}.${level}.${size}`));
         }
         matrix.push(row);
       }
@@ -162,10 +90,8 @@ export function parseMetadata(params: Record<string, any>): LiheapData {
   for (const sub of ['non_subsidized', 'subsidized']) {
     const levels: number[][] = [];
     for (let lvl = 1; lvl <= 6; lvl++) {
-      const utility = get(`gov.states.ma.doer.liheap.standard.amount.${sub}.${lvl}.UTILITY_AND_HEAT_IN_RENT`)
-        ?? DEFAULT_DATA.ma.standard[sub]?.[lvl - 1]?.[0] ?? 0;
-      const deliverable = get(`gov.states.ma.doer.liheap.standard.amount.${sub}.${lvl}.DELIVERABLE_FUEL`)
-        ?? DEFAULT_DATA.ma.standard[sub]?.[lvl - 1]?.[1] ?? 0;
+      const utility = get(`gov.states.ma.doer.liheap.standard.amount.${sub}.${lvl}.UTILITY_AND_HEAT_IN_RENT`);
+      const deliverable = get(`gov.states.ma.doer.liheap.standard.amount.${sub}.${lvl}.DELIVERABLE_FUEL`);
       levels.push([utility, deliverable]);
     }
     maStandard[sub] = levels;
@@ -173,7 +99,7 @@ export function parseMetadata(params: Record<string, any>): LiheapData {
 
   const maHecs: number[] = [];
   for (let lvl = 1; lvl <= 6; lvl++) {
-    maHecs.push(get(`gov.states.ma.doer.liheap.hecs.amount.non_subsidized.${lvl}`) ?? DEFAULT_DATA.ma.hecs[lvl - 1] ?? 0);
+    maHecs.push(get(`gov.states.ma.doer.liheap.hecs.amount.non_subsidized.${lvl}`));
   }
 
   // ── IL ──
@@ -189,8 +115,7 @@ export function parseMetadata(params: Record<string, any>): LiheapData {
     for (let bracket = 1; bracket <= 4; bracket++) {
       const row: number[] = [];
       for (let size = 1; size <= 6; size++) {
-        const key = `gov.states.il.dceo.liheap.payment.matrix.${paramFuel}.${bracket}.${size}`;
-        row.push(get(key) ?? DEFAULT_DATA.il.matrices[fuelKey]?.[bracket - 1]?.[size - 1] ?? 0);
+        row.push(get(`gov.states.il.dceo.liheap.payment.matrix.${paramFuel}.${bracket}.${size}`));
       }
       matrix.push(row);
     }
@@ -199,7 +124,7 @@ export function parseMetadata(params: Record<string, any>): LiheapData {
 
   const ilThresholds: number[] = [];
   for (let i = 0; i < 4; i++) {
-    ilThresholds.push(get(`gov.states.il.dceo.liheap.payment.income_bracket[${i}].threshold`) ?? DEFAULT_DATA.il.bracketThresholds[i]);
+    ilThresholds.push(get(`gov.states.il.dceo.liheap.payment.income_bracket[${i}].threshold`));
   }
 
   return {
@@ -254,7 +179,7 @@ export interface BenefitParams {
   subsidized?: boolean;
 }
 
-export function computeBenefit(p: BenefitParams, data: LiheapData = DEFAULT_DATA): number {
+export function computeBenefit(p: BenefitParams, data: LiheapData): number {
   switch (p.state) {
     case 'DC': {
       const { dc } = data;
@@ -303,11 +228,10 @@ export function generateSurface(params: {
   housingType?: string;
   subsidized?: boolean;
   gridSize?: number;
-  data?: LiheapData;
+  data: LiheapData;
 }): { incomes: number[]; expenses: number[]; benefits: number[][] } {
-  const { state, heatingType, householdSize, housingType, subsidized, data } = params;
+  const { state, heatingType, householdSize, housingType, subsidized, data: d } = params;
   const gridSize = params.gridSize || 30;
-  const d = data || DEFAULT_DATA;
 
   let incomeMax: number;
   if (state === 'IL') incomeMax = getFPL(householdSize) * 2.15;
@@ -333,11 +257,10 @@ export function generateIncomeLines(params: {
   heatingExpense: number;
   housingType?: string;
   subsidized?: boolean;
-  data?: LiheapData;
+  data: LiheapData;
 }): Record<string, number>[] {
-  const { state, householdSize, heatingExpense, housingType, subsidized, data } = params;
+  const { state, householdSize, heatingExpense, housingType, subsidized, data: d } = params;
   const types = CHART_HEATING_TYPES[state];
-  const d = data || DEFAULT_DATA;
 
   let incomeMax: number;
   if (state === 'IL') incomeMax = getFPL(householdSize) * 2.15;
