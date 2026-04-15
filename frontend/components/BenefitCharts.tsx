@@ -150,7 +150,7 @@ export function IncomeLineChart({
           dataKey="income"
           type="number"
           niceTicks="snap125"
-          domain={['auto', 'auto']}
+          domain={[0, 'dataMax']}
           tickFormatter={fmt}
           tick={{ fontFamily: 'Inter, sans-serif', fontSize: 10 }}
 
@@ -253,7 +253,7 @@ export function ExpenseLineChart({
           dataKey="expense"
           type="number"
           niceTicks="snap125"
-          domain={['auto', 'auto']}
+          domain={[0, 'dataMax']}
           tickFormatter={fmt}
           tick={{ fontFamily: 'Inter, sans-serif', fontSize: 10 }}
 
