@@ -1,27 +1,28 @@
-# LIHEAP Repeal Dashboard
+# LIHEAP Benefit Calculator
 
-This repository contains a small Next.js dashboard for exploring LIHEAP impacts.
+Interactive dashboard for exploring LIHEAP (Low Income Home Energy Assistance Program) benefit structures across DC, Massachusetts, and Illinois.
 
-It currently includes:
+## Features
 
-- a household-level LIHEAP calculator for DC, Massachusetts, and Illinois
-- chart visualizations of state benefit schedules
-- a static aggregate-impact dataset rendered in the frontend
-- helper scripts for generating impact data and running a local PolicyEngine-style API
+- **Household calculator** — enter income, household size, heating source, and state to see estimated LIHEAP eligibility and benefit amount
+- **Instant local computation** — after first Calculate click, eligibility and benefit update in real-time as inputs change
+- **Dual 2D charts** — "Benefit by Income" and "Benefit by Heating Expense" show the full benefit schedule with the user's position highlighted
+- **3D surface charts** — optional toggles for Income x Expense and Income x Household Size surfaces (Plotly)
+- **API verification** — Calculate button calls the PolicyEngine API for detailed extras (Income Level, Benefit Level, HECS, etc.)
 
 ## Repo Layout
 
-- `frontend/`: Next.js app
-- `frontend/components/`: calculator, charts, page sections
-- `frontend/lib/`: LIHEAP parsing and benefit logic
-- `frontend/public/data/aggregate_impact.json`: static aggregate impact data used by the app
-- `scripts/generate_liheap_impacts.py`: generates aggregate impact output
-- `scripts/local_api.py`: lightweight local API compatible with the calculator request format
-- `data/`: local state data artifacts
+```
+frontend/                    Next.js app
+  components/                Calculator, charts, page sections
+  lib/liheapData.ts          LIHEAP parsing, benefit computation, eligibility checks
+  lib/liheapFallbackData.json  Bundled 2024 LIHEAP parameter snapshot
+  scripts/                   Validation scripts for chart accuracy
+  public/data/               Static aggregate impact data
+scripts/                     Python helpers (impact generation, local API)
+```
 
 ## Local Development
-
-The frontend lives in `frontend/` and runs on port `3010`.
 
 ```bash
 cd frontend
@@ -29,96 +30,60 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:3010/`.
+Open http://localhost:3010
 
 ## Frontend Commands
 
-Run these from `frontend/`:
+Run from `frontend/`:
 
-```bash
-npm run dev
-npm run typecheck
-npm run lint
-npm run build
-```
-
-Notes:
-
-- `npm run dev` starts the local app on port `3010`
-- `npm run typecheck` runs TypeScript without emitting files
-- `npm run lint` runs Next.js ESLint checks
-- `npm run build` creates a production build and static export
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start dev server on port 3010 |
+| `npm run build` | Production build |
+| `npm run typecheck` | TypeScript check (no emit) |
+| `npm run lint` | ESLint checks |
 
 ## Calculator Data Flow
 
-The household calculator uses two data sources:
+The calculator uses two data sources:
 
-1. Live PolicyEngine API calls to calculate household results.
-2. A bundled LIHEAP parameter snapshot for chart rendering fallback.
+1. **Bundled parameter snapshot** (`liheapFallbackData.json`) — 2024 LIHEAP parameters for all three states, used for instant chart rendering and local benefit computation. Parameters are evaluated at 2024-01-01 to match the PolicyEngine engine.
 
-The chart fallback snapshot lives in:
+2. **Live PolicyEngine API** (`/us/calculate`) — called when user clicks Calculate, returns API-verified eligibility, payment, and state-specific extras.
 
-- `frontend/lib/liheapFallbackData.json`
+### Local computation
 
-If live metadata cannot be fetched, the app still renders charts using that bundled snapshot and shows a warning in the UI.
+Charts and the result row use `computeBenefit()` and `isEligible()` from `liheapData.ts`, which implement the same logic as the PolicyEngine API:
+
+- **DC**: 10-level income matrix, capped by heating expense, 60% SMI eligibility
+- **MA**: 6-level FPL-ratio brackets, standard payment table, 200% FPL eligibility (using prior-year FPG)
+- **IL**: 4-bracket income matrix, max(60% SMI, 200% FPL) eligibility
+
+### Validation
+
+Validation scripts in `frontend/scripts/` compare local computation against the API:
+
+```bash
+node frontend/scripts/validate-charts.mjs
+```
 
 ## Aggregate Impact Data
 
-The frontend reads aggregate impact results from:
-
-- `frontend/public/data/aggregate_impact.json`
-
-To regenerate that data, run the Python script from the repo root after setting up the required Python environment and PolicyEngine dependencies:
+Static aggregate impact data lives in `frontend/public/data/aggregate_impact.json`. To regenerate:
 
 ```bash
 python scripts/generate_liheap_impacts.py
 ```
 
-The script currently depends on `policyengine_us`.
+Requires `policyengine_us`.
 
-## Local API Helper
+## Environment Variables
 
-If you want to test calculator requests against a local PolicyEngine installation instead of the remote API, use:
-
-```bash
-python scripts/local_api.py
-```
-
-That server exposes:
-
-- `POST /us/calculate`
-
-It is designed to mimic the shape of `api.policyengine.org/us/calculate` closely enough for local development.
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `NEXT_PUBLIC_POLICYENGINE_API_URL` | `https://api.policyengine.org` | PolicyEngine API endpoint |
+| `NEXT_PUBLIC_BASE_PATH` | (none) | Base path for GitHub Pages deployment |
 
 ## Deployment
 
-The project is configured for GitHub Pages deployment via:
-
-- `.github/workflows/deploy.yml`
-
-The workflow:
-
-- installs frontend dependencies
-- builds the Next.js static export
-- deploys `frontend/out`
-
-For Pages builds, the workflow sets:
-
-```bash
-NEXT_PUBLIC_BASE_PATH=/liheap-repeal-dashboard
-```
-
-## Current Status
-
-Recent cleanup included:
-
-- adding a real offline fallback for chart metadata
-- removing the build-time Google Fonts dependency
-- making the calculator layout more mobile-safe
-- setting up working `typecheck`, `lint`, and `build` commands
-
-Still worth doing:
-
-- add automated tests for `frontend/lib/liheapData.ts`
-- break up `frontend/components/HouseholdCalculator.tsx` into smaller units
-- decide whether `AggregateImpact` should be exposed in the app or removed
+GitHub Pages via `.github/workflows/deploy.yml`. The workflow builds the Next.js static export and deploys `frontend/out`.
