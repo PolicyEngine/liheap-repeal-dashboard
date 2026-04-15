@@ -329,7 +329,7 @@ export default function HouseholdCalculator() {
                 {localEligible ? 'Eligible' : 'Not Eligible'}
               </span>
               {localEligible && (
-                <span className="text-2xl font-bold text-primary-700 ml-2">{fmt(localBenefit)}</span>
+                <span className="text-2xl font-bold text-primary-700 ml-2">{fmt(localBenefit)}<span className="text-sm font-normal text-gray-400">/yr</span></span>
               )}
             </div>
             {result && result.eligible && result.extras.length > 0 && (
