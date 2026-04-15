@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 import { Surface3DChart, SizeIncome3DChart, IncomeLineChart, ExpenseLineChart } from './BenefitCharts';
 import type { LiheapData } from '@/lib/liheapData';
-import { FALLBACK_LIHEAP_DATA, fetchLiheapData } from '@/lib/liheapData';
+import { FALLBACK_LIHEAP_DATA } from '@/lib/liheapData';
 
 const API_URL = process.env.NEXT_PUBLIC_POLICYENGINE_API_URL || 'https://api.policyengine.org';
 
@@ -151,26 +151,9 @@ export default function HouseholdCalculator() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasCalculated, setHasCalculated] = useState(false);
-  const [liheapData, setLiheapData] = useState<LiheapData | undefined>(undefined);
+  const [liheapData] = useState<LiheapData>(FALLBACK_LIHEAP_DATA);
   const [leftIs3d, setLeftIs3d] = useState(false);
   const [rightIs3d, setRightIs3d] = useState(false);
-  const [usingFallbackData, setUsingFallbackData] = useState(false);
-  const metadataFetched = useRef(false);
-
-  useEffect(() => {
-    if (metadataFetched.current) return;
-    metadataFetched.current = true;
-    fetchLiheapData(API_URL)
-      .then((data) => {
-        setLiheapData(data);
-        setUsingFallbackData(false);
-      })
-      .catch((err) => {
-        console.warn('Failed to fetch live LIHEAP params, using bundled fallback data:', err);
-        setLiheapData(FALLBACK_LIHEAP_DATA);
-        setUsingFallbackData(true);
-      });
-  }, []);
 
   const isHeatInRent = heatingSource === 'HEAT_IN_RENT' || heatingSource === 'CASH';
   const householdSize = nAdults + nChildren;
@@ -351,12 +334,6 @@ export default function HouseholdCalculator() {
           ) : null}
         </div>
       </div>
-
-      {usingFallbackData && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          Charts are using a bundled 2024 LIHEAP parameter snapshot because live metadata could not be loaded.
-        </div>
-      )}
 
       {/* ── Charts: full width, equal split ── */}
       {!hasCalculated ? (

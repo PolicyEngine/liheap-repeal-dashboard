@@ -379,8 +379,8 @@ function chartExpenseMax(state: string, householdSize: number, data: LiheapData)
       break;
     }
   }
-  // Pad by 30% so the cap transition is clearly visible, min $1,000
-  return Math.max(1000, Math.round(maxBenefit * 1.3 / 100) * 100);
+  // Use 2.5x the max benefit so the flat plateau after the cap is clearly visible
+  return Math.max(1000, Math.round(maxBenefit * 2.5 / 100) * 100);
 }
 
 export function generateSurface(params: {
