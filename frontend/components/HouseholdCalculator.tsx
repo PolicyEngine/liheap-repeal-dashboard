@@ -3,9 +3,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { Surface3DChart, SizeIncome3DChart, IncomeLineChart, ExpenseLineChart } from './BenefitCharts';
 import type { LiheapData } from '@/lib/liheapData';
-import { fetchLiheapData } from '@/lib/liheapData';
+import { FALLBACK_LIHEAP_DATA, fetchLiheapData } from '@/lib/liheapData';
 
-const API_URL = 'https://api.policyengine.org';
+const API_URL = process.env.NEXT_PUBLIC_POLICYENGINE_API_URL || 'https://api.policyengine.org';
 
 const STATES = [
   { code: 'DC', label: 'Washington DC' },
@@ -92,7 +92,6 @@ function buildHousehold(
     members.push(pid);
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const spmInputs: Record<string, Record<number, any>> = {};
   const isHeatInRent = heatingSource === 'HEAT_IN_RENT' || heatingSource === 'CASH';
 
@@ -155,14 +154,22 @@ export default function HouseholdCalculator() {
   const [liheapData, setLiheapData] = useState<LiheapData | undefined>(undefined);
   const [leftIs3d, setLeftIs3d] = useState(false);
   const [rightIs3d, setRightIs3d] = useState(false);
+  const [usingFallbackData, setUsingFallbackData] = useState(false);
   const metadataFetched = useRef(false);
 
   useEffect(() => {
     if (metadataFetched.current) return;
     metadataFetched.current = true;
     fetchLiheapData(API_URL)
-      .then(setLiheapData)
-      .catch((err) => console.warn('Failed to fetch live LIHEAP params, using defaults:', err));
+      .then((data) => {
+        setLiheapData(data);
+        setUsingFallbackData(false);
+      })
+      .catch((err) => {
+        console.warn('Failed to fetch live LIHEAP params, using bundled fallback data:', err);
+        setLiheapData(FALLBACK_LIHEAP_DATA);
+        setUsingFallbackData(true);
+      });
   }, []);
 
   const isHeatInRent = heatingSource === 'HEAT_IN_RENT' || heatingSource === 'CASH';
@@ -221,7 +228,7 @@ export default function HouseholdCalculator() {
     v.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
 
   return (
-    <section id="calculator" className="flex flex-col" style={{ height: 'calc(100vh - 7rem)' }}>
+    <section id="calculator" className="flex flex-col gap-3 xl:h-[calc(100vh-7rem)]">
       {/* ── Top bar: inputs + result ── */}
       <div className="rounded-lg border border-gray-200 bg-white px-5 py-3">
         <div className="flex items-end gap-x-3 gap-y-2 flex-wrap">
@@ -345,18 +352,24 @@ export default function HouseholdCalculator() {
         </div>
       </div>
 
+      {usingFallbackData && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          Charts are using a bundled 2024 LIHEAP parameter snapshot because live metadata could not be loaded.
+        </div>
+      )}
+
       {/* ── Charts: full width, equal split ── */}
       {!hasCalculated ? (
-        <div className="flex-1 flex items-center justify-center mt-3 rounded-lg border-2 border-dashed border-gray-200 bg-white">
+        <div className="flex min-h-[18rem] flex-1 items-center justify-center rounded-lg border-2 border-dashed border-gray-200 bg-white xl:min-h-0">
           <div className="text-center">
             <p className="text-gray-400 text-sm">Enter your household details above and click <strong>Calculate</strong></p>
             <p className="text-gray-300 text-xs mt-1">to see your estimated LIHEAP benefit and explore the benefit structure</p>
           </div>
         </div>
       ) : (
-      <div className="flex-1 grid grid-cols-2 gap-3 mt-3 min-h-0">
+      <div className="grid flex-1 min-h-0 grid-cols-1 gap-3 xl:grid-cols-2">
         {/* Left panel: Income (2D) / Income×Expense surface (3D) */}
-        <div className="rounded-lg border border-gray-200 bg-white p-3 flex flex-col min-h-0">
+        <div className="flex min-h-[24rem] flex-col rounded-lg border border-gray-200 bg-white p-3 xl:min-h-0">
           <div className="flex items-center justify-between mb-1">
             <p className="text-sm font-semibold text-gray-700">
               {leftIs3d ? 'Income x Expense Surface' : 'Benefit by Income'}
@@ -407,7 +420,7 @@ export default function HouseholdCalculator() {
         </div>
 
         {/* Right panel: Expense (2D) / Income×Size surface (3D) */}
-        <div className="rounded-lg border border-gray-200 bg-white p-3 flex flex-col min-h-0">
+        <div className="flex min-h-[24rem] flex-col rounded-lg border border-gray-200 bg-white p-3 xl:min-h-0">
           <div className="flex items-center justify-between mb-1">
             <p className="text-sm font-semibold text-gray-700">
               {rightIs3d ? 'Income x Household Size Surface' : 'Benefit by Heating Expense'}

@@ -1,3 +1,5 @@
+import fallbackData from './liheapFallbackData.json';
+
 /**
  * LIHEAP benefit matrices and computation for DC, MA, and IL.
  *
@@ -53,6 +55,8 @@ export interface LiheapData {
   ilFpgLimit: number;
 }
 
+export const FALLBACK_LIHEAP_DATA: LiheapData = fallbackData;
+
 // ===== Simulation date constants =====
 
 const SIM_YEAR = 2024;
@@ -98,7 +102,6 @@ function valueAt(values: Record<string, number>, targetDate: string): number {
  * Parse the PolicyEngine /us/metadata response into LiheapData.
  * All values come from the API, evaluated at the simulation date.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function parseMetadata(params: Record<string, any>): LiheapData {
   const get = (key: string, date: string = EVAL_DATE): number => {
     const p = params[key];

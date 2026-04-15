@@ -62,7 +62,6 @@ export function Surface3DChart({
     [state, heatingType, householdSize, housingType, subsidized, data],
   );
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const trace: any = {
     type: 'surface',
     x: surface.incomes,
@@ -343,7 +342,6 @@ export function SizeIncome3DChart({
     [state, heatingType, heatingExpense, housingType, subsidized, data],
   );
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const trace: any = {
     type: 'surface',
     x: surface.incomes,

@@ -22,10 +22,11 @@ export default function Home() {
       <main className="flex-1 w-full px-4 sm:px-6 py-8">
         <div className={activeTab === 'calculator' ? 'max-w-7xl mx-auto' : 'max-w-5xl mx-auto'}>
           {/* Tab navigation */}
-          <div className="flex gap-2 mb-8">
+          <div className="mb-8 flex flex-wrap gap-2">
             {TABS.map((tab) => (
               <button
                 key={tab.key}
+                type="button"
                 onClick={() => setActiveTab(tab.key)}
                 className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                   activeTab === tab.key
