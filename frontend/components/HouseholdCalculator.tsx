@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Surface3DChart, IncomeLineChart } from './BenefitCharts';
+import { Surface3DChart, SizeIncome3DChart, IncomeLineChart, ExpenseLineChart } from './BenefitCharts';
 import type { LiheapData } from '@/lib/liheapData';
 import { fetchLiheapData } from '@/lib/liheapData';
 
@@ -148,13 +148,15 @@ export default function HouseholdCalculator() {
   const [heatingExpenseLastYear, setHeatingExpenseLastYear] = useState(0);
 
   const [result, setResult] = useState<Result | null>(null);
-  const [hasCalculated, setHasCalculated] = useState(false);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hasCalculated, setHasCalculated] = useState(false);
   const [liheapData, setLiheapData] = useState<LiheapData | undefined>(undefined);
+  const [leftIs3d, setLeftIs3d] = useState(false);
+  const [rightIs3d, setRightIs3d] = useState(false);
   const metadataFetched = useRef(false);
 
-  // Fetch LIHEAP parameters from API metadata in the background on mount
   useEffect(() => {
     if (metadataFetched.current) return;
     metadataFetched.current = true;
@@ -170,13 +172,14 @@ export default function HouseholdCalculator() {
     setState(newState);
     setHeatingSource(HEATING_SOURCES[newState][0].value);
     setResult(null);
-    setHasCalculated(false);
+
   }
 
   async function calculate() {
     setLoading(true);
     setError(null);
     setResult(null);
+    setHasCalculated(true);
     try {
       const household = buildHousehold(
         state, nAdults, nChildren, income,
@@ -205,10 +208,10 @@ export default function HouseholdCalculator() {
         return { label: e.label, value };
       });
       setResult({ eligible: Boolean(eligible), payment: Number(payment), extras });
-      setHasCalculated(true);
+
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
-      setHasCalculated(true);
+
     } finally {
       setLoading(false);
     }
@@ -218,10 +221,10 @@ export default function HouseholdCalculator() {
     v.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
 
   return (
-    <section id="calculator" className="flex flex-col" style={{ height: 'calc(100vh - 10.5rem)' }}>
-      {/* ── Form bar ── */}
-      <div className="rounded-lg border border-gray-200 bg-white px-5 py-4">
-        <div className="flex items-end gap-x-3 gap-y-3">
+    <section id="calculator" className="flex flex-col" style={{ height: 'calc(100vh - 7rem)' }}>
+      {/* ── Top bar: inputs + result ── */}
+      <div className="rounded-lg border border-gray-200 bg-white px-5 py-3">
+        <div className="flex items-end gap-x-3 gap-y-2 flex-wrap">
           <Field label="State" grow>
             <select value={state} onChange={e => handleStateChange(e.target.value)}
               className="field-input w-full">
@@ -260,15 +263,16 @@ export default function HouseholdCalculator() {
             </select>
           </Field>
 
-          <Field label="Expense/yr" grow>
-            <div className="relative">
-              <span className={`absolute left-3 top-1/2 -translate-y-1/2 text-sm ${isHeatInRent ? 'text-gray-300' : 'text-gray-400'}`}>$</span>
-              <input type="number" value={isHeatInRent ? '' : heatingExpense}
-                onChange={e => setHeatingExpense(Number(e.target.value))}
-                disabled={isHeatInRent} placeholder={isHeatInRent ? 'N/A' : ''}
-                className={`field-input field-input-dollar w-full ${isHeatInRent ? 'bg-gray-100 text-gray-400' : ''}`} />
-            </div>
-          </Field>
+          {!isHeatInRent && (
+            <Field label="Expense/yr" grow>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
+                <input type="number" value={heatingExpense}
+                  onChange={e => setHeatingExpense(Number(e.target.value))}
+                  className="field-input field-input-dollar w-full" />
+              </div>
+            </Field>
+          )}
 
           {state === 'DC' && (
             <Field label="Housing" grow>
@@ -314,11 +318,35 @@ export default function HouseholdCalculator() {
             className="h-[38px] bg-primary-600 text-white px-6 rounded-md text-sm font-medium hover:bg-primary-700 disabled:opacity-50 transition-colors whitespace-nowrap shrink-0">
             {loading ? 'Calculating...' : 'Calculate'}
           </button>
+
+          {/* Inline result */}
+          {result ? (
+            <>
+              <div className="h-6 w-px bg-gray-200 self-center" />
+              <div className="flex items-center gap-2 self-center">
+                <span className={`w-2.5 h-2.5 rounded-full ${result.eligible ? 'bg-green-500' : 'bg-gray-400'}`} />
+                <span className={`text-sm font-semibold ${result.eligible ? 'text-green-800' : 'text-gray-600'}`}>
+                  {result.eligible ? 'Eligible' : 'Not Eligible'}
+                </span>
+                {result.eligible && (
+                  <span className="text-xl font-bold text-primary-700 ml-1">{fmt(result.payment)}</span>
+                )}
+              </div>
+              {result.eligible && result.extras.map((e, i) => (
+                <div key={i} className="flex items-center gap-1 self-center text-xs">
+                  <span className="text-gray-400">{e.label}</span>
+                  <span className="font-medium text-gray-700">{e.value}</span>
+                </div>
+              ))}
+            </>
+          ) : error ? (
+            <p className="text-xs text-red-600 self-center">{error}</p>
+          ) : null}
         </div>
       </div>
 
-      {/* ── Main dashboard area ── */}
-      {!hasCalculated && !loading ? (
+      {/* ── Charts: full width, equal split ── */}
+      {!hasCalculated ? (
         <div className="flex-1 flex items-center justify-center mt-3 rounded-lg border-2 border-dashed border-gray-200 bg-white">
           <div className="text-center">
             <p className="text-gray-400 text-sm">Enter your household details above and click <strong>Calculate</strong></p>
@@ -326,15 +354,30 @@ export default function HouseholdCalculator() {
           </div>
         </div>
       ) : (
-        <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-3 mt-3 min-h-0">
-          {/* Left: 3D Surface Chart */}
-          <div className="lg:col-span-2 rounded-lg border border-gray-200 bg-white p-3 flex flex-col min-h-0">
-            <div className="flex items-center justify-between mb-1">
-              <h4 className="text-xs font-semibold text-gray-700">Benefit Landscape</h4>
-              <p className="text-[10px] text-gray-400">Drag to rotate, scroll to zoom</p>
-            </div>
-            <div className="flex-1 min-h-0">
-              {liheapData ? (
+      <div className="flex-1 grid grid-cols-2 gap-3 mt-3 min-h-0">
+        {/* Left panel: Income (2D) / Income×Expense surface (3D) */}
+        <div className="rounded-lg border border-gray-200 bg-white p-3 flex flex-col min-h-0">
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-sm font-semibold text-gray-700">
+              {leftIs3d ? 'Income x Expense Surface' : 'Benefit by Income'}
+              <span className="text-gray-400 font-normal">
+                {leftIs3d ? '' : ` — at ${fmt(isHeatInRent ? 0 : heatingExpense)}/yr expense`}
+              </span>
+            </p>
+            <button
+              onClick={() => setLeftIs3d(!leftIs3d)}
+              className={`px-2 py-0.5 rounded text-[10px] font-medium border transition-colors ${
+                leftIs3d
+                  ? 'bg-gray-800 text-white border-gray-800'
+                  : 'bg-white text-gray-500 border-gray-300 hover:border-gray-400'
+              }`}
+            >
+              {leftIs3d ? '2D' : '3D'}
+            </button>
+          </div>
+          <div className="flex-1 min-h-0">
+            {liheapData ? (
+              leftIs3d ? (
                 <Surface3DChart
                   state={state}
                   heatingType={heatingSource}
@@ -344,89 +387,76 @@ export default function HouseholdCalculator() {
                   data={liheapData}
                 />
               ) : (
-                <div className="flex items-center justify-center h-full">
-                  <p className="text-sm text-gray-400">Loading chart data...</p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Right: Result + Line Chart */}
-          <div className="lg:col-span-1 flex flex-col gap-3 min-h-0">
-            {/* Result card */}
-            <div className="rounded-lg border border-gray-200 bg-white p-4">
-              {error && (
-                <div className="rounded bg-red-50 border border-red-200 p-2 mb-2">
-                  <p className="text-xs text-red-700">{error}</p>
-                </div>
-              )}
-
-              {result ? (
-                <>
-                  <div className={`flex items-center gap-2 ${result.eligible ? '' : 'opacity-60'}`}>
-                    <span className={`w-3 h-3 rounded-full ${result.eligible ? 'bg-green-500' : 'bg-gray-400'}`} />
-                    <span className={`text-base font-semibold ${result.eligible ? 'text-green-800' : 'text-gray-600'}`}>
-                      {result.eligible ? 'Eligible' : 'Not Eligible'}
-                    </span>
-                    {result.eligible && (
-                      <span className="ml-auto text-2xl font-bold text-primary-700">
-                        {fmt(result.payment)}
-                      </span>
-                    )}
-                  </div>
-                  {result.eligible && result.extras.length > 0 && (
-                    <dl className="mt-3 pt-3 border-t border-gray-100 space-y-1">
-                      {result.extras.map((e, i) => (
-                        <div key={i} className="flex justify-between text-sm">
-                          <dt className="text-gray-500">{e.label}</dt>
-                          <dd className="font-medium text-gray-800">{e.value}</dd>
-                        </div>
-                      ))}
-                    </dl>
-                  )}
-                  <p className="text-[10px] text-gray-400 mt-3">
-                    Estimate via <a href="https://policyengine.org" target="_blank" rel="noopener noreferrer"
-                      className="underline hover:text-gray-600">PolicyEngine API</a>. Actual benefits may vary.
-                  </p>
-                </>
-              ) : (
-                <div className="flex items-center justify-center py-3">
-                  <p className="text-sm text-gray-400">
-                    {loading ? 'Calculating...' : 'Click Calculate to estimate your benefit'}
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* Line chart */}
-            <div className="flex-1 rounded-lg border border-gray-200 bg-white p-3 flex flex-col min-h-0">
-              <div className="flex items-center justify-between mb-1">
-                <h4 className="text-xs font-semibold text-gray-700">Benefit by Income</h4>
-                <p className="text-[10px] text-gray-400">
-                  At {fmt(isHeatInRent ? 0 : heatingExpense)}/yr expense
-                </p>
+                <IncomeLineChart
+                  state={state}
+                  householdSize={householdSize}
+                  housingType={dcHousingType}
+                  subsidized={receivesHousingAssistance}
+                  chartExpense={isHeatInRent ? 99999 : heatingExpense}
+                  data={liheapData}
+                  highlightIncome={!result || result.eligible ? income : undefined}
+                  highlightHeatingType={!result || result.eligible ? heatingSource : undefined}
+                />
+              )
+            ) : (
+              <div className="flex items-center justify-center h-full">
+                <p className="text-xs text-gray-400">Loading...</p>
               </div>
-              <div className="flex-1 min-h-0">
-                {liheapData ? (
-                  <IncomeLineChart
-                    state={state}
-                    householdSize={householdSize}
-                    housingType={dcHousingType}
-                    subsidized={receivesHousingAssistance}
-                    chartExpense={isHeatInRent ? 99999 : heatingExpense}
-                    data={liheapData}
-                    highlightIncome={income}
-                    highlightHeatingType={heatingSource}
-                  />
-                ) : (
-                  <div className="flex items-center justify-center h-full">
-                    <p className="text-xs text-gray-400">Loading...</p>
-                  </div>
-                )}
-              </div>
-            </div>
+            )}
           </div>
         </div>
+
+        {/* Right panel: Expense (2D) / Income×Size surface (3D) */}
+        <div className="rounded-lg border border-gray-200 bg-white p-3 flex flex-col min-h-0">
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-sm font-semibold text-gray-700">
+              {rightIs3d ? 'Income x Household Size Surface' : 'Benefit by Heating Expense'}
+              <span className="text-gray-400 font-normal">
+                {rightIs3d ? '' : ` — at ${fmt(income)}/yr income`}
+              </span>
+            </p>
+            <button
+              onClick={() => setRightIs3d(!rightIs3d)}
+              className={`px-2 py-0.5 rounded text-[10px] font-medium border transition-colors ${
+                rightIs3d
+                  ? 'bg-gray-800 text-white border-gray-800'
+                  : 'bg-white text-gray-500 border-gray-300 hover:border-gray-400'
+              }`}
+            >
+              {rightIs3d ? '2D' : '3D'}
+            </button>
+          </div>
+          <div className="flex-1 min-h-0">
+            {liheapData ? (
+              rightIs3d ? (
+                <SizeIncome3DChart
+                  state={state}
+                  heatingType={heatingSource}
+                  housingType={dcHousingType}
+                  subsidized={receivesHousingAssistance}
+                  heatingExpense={isHeatInRent ? 99999 : heatingExpense}
+                  data={liheapData}
+                />
+              ) : (
+                <ExpenseLineChart
+                  state={state}
+                  householdSize={householdSize}
+                  housingType={dcHousingType}
+                  subsidized={receivesHousingAssistance}
+                  chartIncome={income}
+                  data={liheapData}
+                  highlightExpense={!result || result.eligible ? (isHeatInRent ? undefined : heatingExpense) : undefined}
+                  highlightHeatingType={!result || result.eligible ? heatingSource : undefined}
+                />
+              )
+            ) : (
+              <div className="flex items-center justify-center h-full">
+                <p className="text-xs text-gray-400">Loading...</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
       )}
     </section>
   );
