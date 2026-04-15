@@ -59,15 +59,15 @@ export const FALLBACK_LIHEAP_DATA: LiheapData = fallbackData;
 
 // ===== Simulation date constants =====
 
-const SIM_YEAR = 2024;
+const SIM_YEAR = 2026;
 const EVAL_DATE = `${SIM_YEAR}-01-01`;
 /** MA evaluates FPG at the prior fiscal year start (Oct 1 of year-1) */
 const MA_FPG_DATE = `${SIM_YEAR - 1}-10-01`;
 
-// ===== Hardcoded FPL fallbacks (2024 HHS poverty guidelines) =====
+// ===== Hardcoded FPL fallbacks (2026 HHS poverty guidelines) =====
 
-const FPL_BASE = 15060;
-const FPL_INCREMENT = 5380;
+const FPL_BASE = 15960;
+const FPL_INCREMENT = 5680;
 
 export function getFPL(householdSize: number, data?: LiheapData, state?: string): number {
   if (data) {

@@ -344,6 +344,7 @@ export default function HouseholdCalculator() {
               </>
             )}
             {error && <p className="text-sm text-red-600 ml-2">{error}</p>}
+            <p className="text-[10px] text-gray-400 ml-auto">Heating assistance only — does not include cooling, crisis, or weatherization benefits</p>
           </div>
         )}
       </div>
