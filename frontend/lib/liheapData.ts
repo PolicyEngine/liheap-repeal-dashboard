@@ -237,7 +237,7 @@ function getSMI(state: string, householdSize: number, data: LiheapData): number 
 }
 
 /** Check LIHEAP income eligibility for a given state */
-function isEligible(state: string, income: number, householdSize: number, data: LiheapData): boolean {
+export function isEligible(state: string, income: number, householdSize: number, data: LiheapData): boolean {
   const smiThreshold = getSMI(state, householdSize, data) * data.smi.smiLimit;
   if (state === 'IL') {
     const fplThreshold = getFPL(householdSize, data, 'IL') * data.ilFpgLimit;

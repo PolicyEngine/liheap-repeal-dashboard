@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Surface3DChart, SizeIncome3DChart, IncomeLineChart, ExpenseLineChart } from './BenefitCharts';
 import type { LiheapData } from '@/lib/liheapData';
-import { FALLBACK_LIHEAP_DATA } from '@/lib/liheapData';
+import { FALLBACK_LIHEAP_DATA, computeBenefit, isEligible } from '@/lib/liheapData';
 
 const API_URL = process.env.NEXT_PUBLIC_POLICYENGINE_API_URL || 'https://api.policyengine.org';
 
@@ -150,13 +150,22 @@ export default function HouseholdCalculator() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [hasCalculated, setHasCalculated] = useState(false);
+
   const [liheapData] = useState<LiheapData>(FALLBACK_LIHEAP_DATA);
+  const [hasCalculated, setHasCalculated] = useState(false);
   const [leftIs3d, setLeftIs3d] = useState(false);
   const [rightIs3d, setRightIs3d] = useState(false);
 
   const isHeatInRent = heatingSource === 'HEAT_IN_RENT' || heatingSource === 'CASH';
   const householdSize = nAdults + nChildren;
+
+  // Local instant computation — updates as inputs change
+  const localEligible = isEligible(state, income, householdSize, liheapData);
+  const localBenefit = localEligible ? computeBenefit({
+    state, heatingType: heatingSource, income,
+    heatingExpense: isHeatInRent ? 99999 : heatingExpense,
+    householdSize, housingType: dcHousingType, subsidized: receivesHousingAssistance,
+  }, liheapData) : 0;
 
   function handleStateChange(newState: string) {
     setState(newState);
@@ -166,10 +175,11 @@ export default function HouseholdCalculator() {
   }
 
   async function calculate() {
+    setHasCalculated(true);
     setLoading(true);
     setError(null);
     setResult(null);
-    setHasCalculated(true);
+
     try {
       const household = buildHousehold(
         state, nAdults, nChildren, income,
@@ -308,31 +318,34 @@ export default function HouseholdCalculator() {
             className="h-[38px] bg-primary-600 text-white px-6 rounded-md text-sm font-medium hover:bg-primary-700 disabled:opacity-50 transition-colors whitespace-nowrap shrink-0">
             {loading ? 'Calculating...' : 'Calculate'}
           </button>
-
-          {/* Inline result */}
-          {result ? (
-            <>
-              <div className="h-6 w-px bg-gray-200 self-center" />
-              <div className="flex items-center gap-2 self-center">
-                <span className={`w-2.5 h-2.5 rounded-full ${result.eligible ? 'bg-green-500' : 'bg-gray-400'}`} />
-                <span className={`text-sm font-semibold ${result.eligible ? 'text-green-800' : 'text-gray-600'}`}>
-                  {result.eligible ? 'Eligible' : 'Not Eligible'}
-                </span>
-                {result.eligible && (
-                  <span className="text-xl font-bold text-primary-700 ml-1">{fmt(result.payment)}</span>
-                )}
-              </div>
-              {result.eligible && result.extras.map((e, i) => (
-                <div key={i} className="flex items-center gap-1 self-center text-xs">
-                  <span className="text-gray-400">{e.label}</span>
-                  <span className="font-medium text-gray-700">{e.value}</span>
-                </div>
-              ))}
-            </>
-          ) : error ? (
-            <p className="text-xs text-red-600 self-center">{error}</p>
-          ) : null}
         </div>
+
+        {/* Result row — local computation, updates instantly after first Calculate */}
+        {hasCalculated && (
+          <div className="mt-3 pt-3 border-t border-gray-100 flex items-center gap-4 flex-wrap">
+            <div className="flex items-center gap-2">
+              <span className={`w-3 h-3 rounded-full ${localEligible ? 'bg-green-500' : 'bg-gray-400'}`} />
+              <span className={`text-base font-semibold ${localEligible ? 'text-green-800' : 'text-gray-600'}`}>
+                {localEligible ? 'Eligible' : 'Not Eligible'}
+              </span>
+              {localEligible && (
+                <span className="text-2xl font-bold text-primary-700 ml-2">{fmt(localBenefit)}</span>
+              )}
+            </div>
+            {result && result.eligible && result.extras.length > 0 && (
+              <>
+                <div className="h-5 w-px bg-gray-200" />
+                {result.extras.map((e, i) => (
+                  <div key={i} className="flex items-center gap-1.5 text-sm">
+                    <span className="text-gray-500">{e.label}</span>
+                    <span className="font-medium text-gray-800">{e.value}</span>
+                  </div>
+                ))}
+              </>
+            )}
+            {error && <p className="text-sm text-red-600 ml-2">{error}</p>}
+          </div>
+        )}
       </div>
 
       {/* ── Charts: full width, equal split ── */}
@@ -384,8 +397,8 @@ export default function HouseholdCalculator() {
                   subsidized={receivesHousingAssistance}
                   chartExpense={isHeatInRent ? 99999 : heatingExpense}
                   data={liheapData}
-                  highlightIncome={!result || result.eligible ? income : undefined}
-                  highlightHeatingType={!result || result.eligible ? heatingSource : undefined}
+                  highlightIncome={localEligible ? income : undefined}
+                  highlightHeatingType={localEligible ? heatingSource : undefined}
                 />
               )
             ) : (
@@ -435,8 +448,8 @@ export default function HouseholdCalculator() {
                   subsidized={receivesHousingAssistance}
                   chartIncome={income}
                   data={liheapData}
-                  highlightExpense={!result || result.eligible ? (isHeatInRent ? undefined : heatingExpense) : undefined}
-                  highlightHeatingType={!result || result.eligible ? heatingSource : undefined}
+                  highlightExpense={localEligible ? (isHeatInRent ? undefined : heatingExpense) : undefined}
+                  highlightHeatingType={localEligible ? heatingSource : undefined}
                 />
               )
             ) : (
