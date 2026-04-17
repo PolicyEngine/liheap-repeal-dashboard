@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Script from 'next/script';
 import './globals.css';
 
-const GA_ID = 'G-91M4529HE7';
+const GA_ID = 'G-2YHG89FY0N';
 const TOOL_NAME = 'liheap-repeal-dashboard';
 
 export const metadata: Metadata = {
