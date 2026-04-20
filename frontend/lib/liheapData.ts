@@ -3,9 +3,8 @@ import fallbackData from './liheapFallbackData.json';
 /**
  * LIHEAP benefit matrices and computation for DC, MA, and IL.
  *
- * Data comes from the PolicyEngine /us/metadata API at runtime.
- * Parameter values are evaluated at the simulation date (2024-01-01)
- * to match what the PolicyEngine engine uses for year 2024.
+ * Parameters are bundled as a JSON snapshot (FY2026 values)
+ * evaluated at the simulation date (2026-01-01).
  */
 
 // ===== Data types =====

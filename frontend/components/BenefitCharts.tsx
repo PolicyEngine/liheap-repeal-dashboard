@@ -157,7 +157,7 @@ export function IncomeLineChart({
         />
         <YAxis
           niceTicks="snap125"
-          domain={[0, 'auto']}
+          domain={[0, (dataMax: number) => Math.ceil(dataMax * 1.15 / 100) * 100]}
           tickFormatter={fmt}
           tick={{ fontFamily: 'Inter, sans-serif', fontSize: 10 }}
           width={55}
@@ -260,7 +260,7 @@ export function ExpenseLineChart({
         />
         <YAxis
           niceTicks="snap125"
-          domain={[0, 'auto']}
+          domain={[0, (dataMax: number) => Math.ceil(dataMax * 1.15 / 100) * 100]}
           tickFormatter={fmt}
           tick={{ fontFamily: 'Inter, sans-serif', fontSize: 10 }}
           width={55}
