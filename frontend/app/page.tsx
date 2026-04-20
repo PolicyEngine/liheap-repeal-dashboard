@@ -22,11 +22,15 @@ export default function Home() {
       <main className="flex-1 w-full px-4 sm:px-6 py-8">
         <div className={activeTab === 'calculator' ? 'max-w-7xl mx-auto' : 'max-w-5xl mx-auto'}>
           {/* Tab navigation */}
-          <div className="mb-8 flex flex-wrap gap-2">
+          <nav aria-label="Main sections" className="mb-8 flex flex-wrap gap-2" role="tablist">
             {TABS.map((tab) => (
               <button
                 key={tab.key}
                 type="button"
+                role="tab"
+                aria-selected={activeTab === tab.key}
+                aria-controls={`tabpanel-${tab.key}`}
+                id={`tab-${tab.key}`}
                 onClick={() => setActiveTab(tab.key)}
                 className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                   activeTab === tab.key
@@ -37,11 +41,17 @@ export default function Home() {
                 {tab.label}
               </button>
             ))}
-          </div>
+          </nav>
 
           {/* Tab content */}
-          {activeTab === 'overview' && <PolicyOverview onTabChange={(tab) => setActiveTab(tab as TabKey)} />}
-          {activeTab === 'calculator' && <HouseholdCalculator />}
+          <div
+            id={`tabpanel-${activeTab}`}
+            role="tabpanel"
+            aria-labelledby={`tab-${activeTab}`}
+          >
+            {activeTab === 'overview' && <PolicyOverview onTabChange={(tab) => setActiveTab(tab as TabKey)} />}
+            {activeTab === 'calculator' && <HouseholdCalculator />}
+          </div>
         </div>
       </main>
       <Footer />

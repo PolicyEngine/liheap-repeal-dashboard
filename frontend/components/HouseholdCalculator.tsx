@@ -171,6 +171,7 @@ export default function HouseholdCalculator() {
           )}
 
           <button onClick={calculate}
+            aria-label="Calculate LIHEAP benefit estimate"
             className="h-[38px] bg-primary-600 text-white px-6 rounded-md text-sm font-medium hover:bg-primary-700 transition-colors whitespace-nowrap shrink-0">
             Calculate
           </button>
@@ -322,10 +323,10 @@ export default function HouseholdCalculator() {
   );
 }
 
-function Field({ label, children, grow }: { label: string; children: React.ReactNode; grow?: boolean }) {
+function Field({ label, children, grow, htmlFor }: { label: string; children: React.ReactNode; grow?: boolean; htmlFor?: string }) {
   return (
     <div className={grow ? 'flex-1 min-w-0' : ''}>
-      <label className="block text-xs font-medium text-gray-500 mb-1">{label}</label>
+      <label htmlFor={htmlFor} className="block text-xs font-medium text-gray-500 mb-1">{label}</label>
       {children}
     </div>
   );

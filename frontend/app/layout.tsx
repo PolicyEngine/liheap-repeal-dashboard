@@ -1,14 +1,51 @@
 import type { Metadata } from 'next';
+import { Inter } from 'next/font/google';
 import Script from 'next/script';
 import './globals.css';
+
+const inter = Inter({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-inter',
+});
 
 const GA_ID = 'G-2YHG89FY0N';
 const TOOL_NAME = 'liheap-repeal-dashboard';
 
+const SITE_URL = 'https://policyengine.github.io/liheap-repeal-dashboard';
+const SITE_TITLE =
+  'LIHEAP Benefit Calculator | Estimate Your Heating Assistance | PolicyEngine';
+const SITE_DESCRIPTION =
+  'Free LIHEAP benefit calculator — estimate your Low Income Home Energy Assistance Program eligibility and heating benefit amount for Washington DC, Massachusetts, and Illinois.';
+
 export const metadata: Metadata = {
-  title: 'LIHEAP Benefit Calculator',
-  description:
-    'Estimate your LIHEAP eligibility and benefit amount for DC, Massachusetts, and Illinois.',
+  title: SITE_TITLE,
+  description: SITE_DESCRIPTION,
+  metadataBase: new URL(SITE_URL),
+  alternates: {
+    canonical: '/',
+  },
+  openGraph: {
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    url: SITE_URL,
+    siteName: 'PolicyEngine',
+    type: 'website',
+    locale: 'en_US',
+  },
+  twitter: {
+    card: 'summary',
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    site: '@ThePolicyEngine',
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
+  other: {
+    'theme-color': '#2C7A7B',
+  },
 };
 
 export default function RootLayout({
@@ -16,9 +53,34 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'WebApplication',
+    name: 'LIHEAP Benefit Calculator',
+    description: SITE_DESCRIPTION,
+    url: SITE_URL,
+    applicationCategory: 'FinanceApplication',
+    operatingSystem: 'Any',
+    offers: {
+      '@type': 'Offer',
+      price: '0',
+      priceCurrency: 'USD',
+    },
+    author: {
+      '@type': 'Organization',
+      name: 'PolicyEngine',
+      url: 'https://policyengine.org',
+    },
+  };
+
   return (
-    <html lang="en">
+    <html lang="en" className={inter.variable}>
       <head>
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
         <Script
           src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`}
           strategy="afterInteractive"
