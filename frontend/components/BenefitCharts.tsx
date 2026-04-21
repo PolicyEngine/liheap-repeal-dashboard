@@ -47,8 +47,6 @@ const TOOLTIP_STYLE = {
 const fmt = (v: number) =>
   v.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
 
-const withHeadroom = (dataMax: number) => (dataMax <= 0 ? 1 : dataMax * 1.2);
-
 export interface ChartParams {
   state: string;
   heatingType: string;
@@ -154,14 +152,14 @@ export function IncomeLineChart({
           dataKey="income"
           type="number"
           niceTicks="snap125"
-          domain={[0, 'auto']}
+          domain={['auto', 'auto']}
           tickFormatter={fmt}
           tick={{ fontFamily: 'var(--font-sans)', fontSize: 10, fill: 'var(--foreground)' }}
           label={{ value: 'Annual Income', position: 'insideBottom', offset: -18, style: { fontSize: 11, fill: 'var(--foreground)', opacity: 0.6 } }}
         />
         <YAxis
           niceTicks="snap125"
-          domain={[0, withHeadroom]}
+          domain={['auto', 'auto']}
           tickFormatter={fmt}
           tick={{ fontFamily: 'var(--font-sans)', fontSize: 10, fill: 'var(--foreground)' }}
           width={55}
@@ -249,14 +247,14 @@ export function ExpenseLineChart({
           dataKey="expense"
           type="number"
           niceTicks="snap125"
-          domain={[0, 'auto']}
+          domain={['auto', 'auto']}
           tickFormatter={fmt}
           tick={{ fontFamily: 'var(--font-sans)', fontSize: 10, fill: 'var(--foreground)' }}
 
         />
         <YAxis
           niceTicks="snap125"
-          domain={[0, withHeadroom]}
+          domain={['auto', 'auto']}
           tickFormatter={fmt}
           tick={{ fontFamily: 'var(--font-sans)', fontSize: 10, fill: 'var(--foreground)' }}
           width={55}
@@ -429,7 +427,7 @@ export function SizeLineChart({
         />
         <YAxis
           niceTicks="snap125"
-          domain={[0, withHeadroom]}
+          domain={['auto', 'auto']}
           tickFormatter={fmt}
           tick={{ fontFamily: 'var(--font-sans)', fontSize: 10, fill: 'var(--foreground)' }}
           width={55}
@@ -514,7 +512,7 @@ export function CoverageLineChart({
           dataKey="expense"
           type="number"
           niceTicks="snap125"
-          domain={[0, 'auto']}
+          domain={['auto', 'auto']}
           tickFormatter={fmt}
           tick={{ fontFamily: 'var(--font-sans)', fontSize: 10, fill: 'var(--foreground)' }}
         />
