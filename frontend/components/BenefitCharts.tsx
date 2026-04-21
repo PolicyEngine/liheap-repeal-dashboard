@@ -168,7 +168,7 @@ export function IncomeLineChart({
         <Tooltip
           contentStyle={TOOLTIP_STYLE}
           separator=": "
-          labelFormatter={(v) => `Income: ${fmt(v as number)}`}
+          labelFormatter={(v) => `Income: ${fmt(Math.round((v as number) / 100) * 100)}`}
           formatter={(value, name) => {
             const ht = types.find((t) => t.value === name);
             return [fmt(Number(value)), ht?.label || String(name)];

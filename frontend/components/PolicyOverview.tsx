@@ -27,7 +27,7 @@ export default function PolicyOverview({ onTabChange }: { onTabChange?: (tab: st
           the three states where PolicyEngine has detailed LIHEAP payment models.
         </p>
         <ul className="list-disc ml-5 space-y-1.5 text-gray-600 text-sm">
-          <li>Calculations run against the <a href="https://policyengine.org" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">PolicyEngine API</a>, which models each state&apos;s specific payment schedule and eligibility rules.</li>
+          <li>Calculations run against the <a href="https://policyengine.org/us/api" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">PolicyEngine API</a>, which models each state&apos;s specific payment schedule and eligibility rules.</li>
           <li>Benefits are based on heating fuel type, household size, and income relative to state thresholds.</li>
           <li>Results are estimates — actual benefits may differ due to administrative factors, funding availability, and documentation requirements.</li>
         </ul>
@@ -36,8 +36,9 @@ export default function PolicyOverview({ onTabChange }: { onTabChange?: (tab: st
           className="flex items-center gap-3 rounded-lg border border-gray-200 bg-white p-4 text-left hover:border-primary-300 hover:bg-primary-50 transition-colors mt-2"
         >
           <span className="flex items-center justify-center w-9 h-9 rounded-full bg-primary-100 text-primary-700 shrink-0">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 15.75V18m-7.5-6.75h.008v.008H8.25v-.008zm0 2.25h.008v.008H8.25v-.008zm0 2.25h.008v.008H8.25v-.008zm2.25-4.5h.008v.008h-.008v-.008zm0 2.25h.008v.008h-.008v-.008zm2.25-4.5h.008v.008H12.75v-.008zm0 2.25h.008v.008H12.75v-.008z" />
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden="true">
+              <rect x="5" y="3" width="14" height="18" rx="2" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M8 7h8M8 11h2m3 0h3M8 15h2m3 0h3M8 19h2m3 0h3" />
             </svg>
           </span>
           <div>
