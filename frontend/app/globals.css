@@ -3,11 +3,11 @@
 @tailwind utilities;
 
 :root {
-  --chart-1: #319795;
-  --chart-2: #E53E3E;
-  --chart-3: #DD6B20;
-  --chart-4: #D69E2E;
-  --chart-5: #805AD5;
+  --chart-1: #0891B2;
+  --chart-2: #DC2626;
+  --chart-3: #78350F;
+  --chart-4: #CA8A04;
+  --chart-5: #7C3AED;
   --chart-6: #D53F8C;
   --border: #E2E8F0;
   --background: #FFFFFF;

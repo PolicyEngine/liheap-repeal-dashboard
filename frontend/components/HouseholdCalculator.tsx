@@ -1,9 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { Surface3DChart, SizeIncome3DChart, IncomeLineChart, ExpenseLineChart } from './BenefitCharts';
+import { Surface3DChart, SizeIncome3DChart, IncomeLineChart, SizeLineChart } from './BenefitCharts';
 import type { LiheapData } from '@/lib/liheapData';
-import { FALLBACK_LIHEAP_DATA, computeBenefit, isEligible } from '@/lib/liheapData';
+import { FALLBACK_LIHEAP_DATA, computeBenefit, isEligible, CHART_HEATING_TYPES } from '@/lib/liheapData';
 
 const STATES = [
   { code: 'DC', label: 'Washington DC' },
@@ -75,6 +75,10 @@ export default function HouseholdCalculator() {
   const fmt = (v: number) =>
     v.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
 
+  // Format number with commas for display; parse by stripping non-digits
+  const fmtInt = (v: number) => v.toLocaleString('en-US');
+  const parseInput = (s: string) => Number(s.replace(/[^0-9]/g, '')) || 0;
+
   return (
     <section id="calculator" className="flex flex-col gap-3 xl:h-[calc(100vh-7rem)]">
       {/* ── Top bar: inputs + result ── */}
@@ -105,7 +109,8 @@ export default function HouseholdCalculator() {
           <Field label="Annual Income" grow>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
-              <input type="number" value={income} onChange={e => setIncome(Number(e.target.value))}
+              <input type="text" inputMode="numeric" value={fmtInt(income)}
+                onChange={e => setIncome(parseInput(e.target.value))}
                 className="field-input field-input-dollar w-full" />
             </div>
           </Field>
@@ -123,8 +128,8 @@ export default function HouseholdCalculator() {
             <Field label="Expense/yr" grow>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
-                <input type="number" value={heatingExpense}
-                  onChange={e => setHeatingExpense(Number(e.target.value))}
+                <input type="text" inputMode="numeric" value={fmtInt(heatingExpense)}
+                  onChange={e => setHeatingExpense(parseInput(e.target.value))}
                   className="field-input field-input-dollar w-full" />
               </div>
             </Field>
@@ -144,7 +149,8 @@ export default function HouseholdCalculator() {
             <Field label="Rent/yr" grow>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
-                <input type="number" value={rent} onChange={e => setRent(Number(e.target.value))}
+                <input type="text" inputMode="numeric" value={fmtInt(rent)}
+                  onChange={e => setRent(parseInput(e.target.value))}
                   className="field-input field-input-dollar w-full" />
               </div>
             </Field>
@@ -162,8 +168,10 @@ export default function HouseholdCalculator() {
               <Field label="Prior yr exp" grow>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
-                  <input type="number" value={heatingExpenseLastYear || ''} placeholder="0"
-                    onChange={e => setHeatingExpenseLastYear(Number(e.target.value))}
+                  <input type="text" inputMode="numeric"
+                    value={heatingExpenseLastYear ? fmtInt(heatingExpenseLastYear) : ''}
+                    placeholder="0"
+                    onChange={e => setHeatingExpenseLastYear(parseInput(e.target.value))}
                     className="field-input field-input-dollar w-full" />
                 </div>
               </Field>
@@ -198,6 +206,16 @@ export default function HouseholdCalculator() {
               </div>
             )}
 
+            {/* Coverage % */}
+            {localEligible && !isHeatInRent && heatingExpense > 0 && (
+              <div className="flex items-baseline gap-2 ml-4 pl-4 border-l border-gray-200">
+                <span className="text-2xl font-bold text-gray-700 leading-none">
+                  {Math.round(Math.min(100, (localBenefit / heatingExpense) * 100))}%
+                </span>
+                <span className="text-sm text-gray-500">of your heating bill</span>
+              </div>
+            )}
+
             {/* Disclaimer */}
             <p className="text-[11px] text-gray-400 ml-auto whitespace-nowrap">
               Heating assistance only — excludes cooling, crisis &amp; weatherization
@@ -215,6 +233,28 @@ export default function HouseholdCalculator() {
           </div>
         </div>
       ) : (
+      <div className="flex flex-1 min-h-0 flex-col gap-2">
+        {/* Shared heating type legend */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2 rounded-lg border border-gray-200 bg-white">
+          <span className="text-[11px] text-gray-500 font-medium">Heating:</span>
+          {(CHART_HEATING_TYPES[state] || []).map((ht) => {
+            const isSelected = heatingSource === ht.value;
+            return (
+              <div key={ht.value} className={`flex items-center gap-1.5 text-[11px] transition-opacity ${isSelected ? 'font-semibold' : 'opacity-60'}`}>
+                <span
+                  className="inline-block rounded-full"
+                  style={{
+                    width: isSelected ? 12 : 10,
+                    height: isSelected ? 3 : 2,
+                    background: ht.color,
+                  }}
+                />
+                <span className="text-gray-700">{ht.label}</span>
+              </div>
+            );
+          })}
+        </div>
+
       <div className="grid flex-1 min-h-0 grid-cols-1 gap-3 xl:grid-cols-2">
         {/* Left panel: Income (2D) / Income×Expense surface (3D) */}
         <div className="flex min-h-[24rem] flex-col rounded-lg border border-gray-200 bg-white p-3 xl:min-h-0">
@@ -267,11 +307,11 @@ export default function HouseholdCalculator() {
           </div>
         </div>
 
-        {/* Right panel: Expense (2D) / Income×Size surface (3D) */}
+        {/* Right panel: Benefit by Household Size (2D) / Income×Size surface (3D) */}
         <div className="flex min-h-[24rem] flex-col rounded-lg border border-gray-200 bg-white p-3 xl:min-h-0">
           <div className="flex items-center justify-between mb-1">
             <p className="text-sm font-semibold text-gray-700">
-              {rightIs3d ? 'Income x Household Size Surface' : 'Benefit by Heating Expense'}
+              {rightIs3d ? 'Income x Household Size Surface' : 'Benefit by Household Size'}
               <span className="text-gray-400 font-normal">
                 {rightIs3d ? '' : ` — at ${fmt(income)}/yr income`}
               </span>
@@ -299,14 +339,14 @@ export default function HouseholdCalculator() {
                   data={liheapData}
                 />
               ) : (
-                <ExpenseLineChart
+                <SizeLineChart
                   state={state}
-                  householdSize={householdSize}
+                  income={income}
+                  heatingExpense={isHeatInRent ? 99999 : heatingExpense}
                   housingType={dcHousingType}
                   subsidized={receivesHousingAssistance}
-                  chartIncome={income}
                   data={liheapData}
-                  highlightExpense={localEligible ? (isHeatInRent ? undefined : heatingExpense) : undefined}
+                  highlightSize={localEligible ? householdSize : undefined}
                   highlightHeatingType={localEligible ? heatingSource : undefined}
                 />
               )
@@ -317,6 +357,7 @@ export default function HouseholdCalculator() {
             )}
           </div>
         </div>
+      </div>
       </div>
       )}
     </section>

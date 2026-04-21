@@ -460,6 +460,61 @@ export function generateExpenseLines(params: {
   });
 }
 
+/** Generate benefit-by-household-size lines (one series per heating type). */
+export function generateSizeLines(params: {
+  state: string;
+  income: number;
+  heatingExpense: number;
+  housingType?: string;
+  subsidized?: boolean;
+  data: LiheapData;
+}): Record<string, number>[] {
+  const { state, income, heatingExpense, housingType, subsidized, data: d } = params;
+  const types = CHART_HEATING_TYPES[state];
+  // Always show sizes 1-6 for visual consistency across states
+  // (DC caps internally at 4; computeBenefit handles the cap)
+  const maxSize = 6;
+
+  return Array.from({ length: maxSize }, (_, i) => {
+    const size = i + 1;
+    const point: Record<string, number> = { size };
+    for (const ht of types) {
+      point[ht.value] = computeBenefit(
+        { state, heatingType: ht.value, income, heatingExpense, householdSize: size, housingType, subsidized }, d,
+      );
+    }
+    return point;
+  });
+}
+
+/** Generate coverage ratio (benefit / expense) by heating expense. */
+export function generateCoverageLines(params: {
+  state: string;
+  householdSize: number;
+  income: number;
+  housingType?: string;
+  subsidized?: boolean;
+  data: LiheapData;
+  highlightExpense?: number;
+}): Record<string, number>[] {
+  const { state, householdSize, income, housingType, subsidized, data: d, highlightExpense } = params;
+  const types = CHART_HEATING_TYPES[state];
+
+  const expenseMax = Math.max(chartExpenseMax(state, householdSize, d), (highlightExpense ?? 0) * 1.15);
+  const steps = 100;
+  return Array.from({ length: steps }, (_, i) => {
+    const expense = Math.round(((i + 1) * expenseMax) / steps); // skip 0 to avoid divide-by-zero
+    const point: Record<string, number> = { expense };
+    for (const ht of types) {
+      const benefit = computeBenefit(
+        { state, heatingType: ht.value, income, heatingExpense: expense, householdSize, housingType, subsidized }, d,
+      );
+      point[ht.value] = expense > 0 ? Math.min(100, (benefit / expense) * 100) : 0;
+    }
+    return point;
+  });
+}
+
 export function generateSizeSurface(params: {
   state: string;
   heatingType: string;

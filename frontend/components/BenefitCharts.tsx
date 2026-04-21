@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, Legend, ReferenceDot, ReferenceLine, Label,
+  Tooltip, ResponsiveContainer, ReferenceDot, ReferenceLine, Label,
 } from 'recharts';
 import type { LiheapData } from '@/lib/liheapData';
 import {
@@ -12,6 +12,8 @@ import {
   generateSizeSurface,
   generateIncomeLines,
   generateExpenseLines,
+  generateSizeLines,
+  generateCoverageLines,
   computeBenefit,
   CHART_HEATING_TYPES,
 } from '@/lib/liheapData';
@@ -44,6 +46,8 @@ const TOOLTIP_STYLE = {
 
 const fmt = (v: number) =>
   v.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+
+const withHeadroom = (dataMax: number) => (dataMax <= 0 ? 1 : dataMax * 1.2);
 
 export interface ChartParams {
   state: string;
@@ -144,24 +148,24 @@ export function IncomeLineChart({
 
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <LineChart data={lineData} margin={{ left: 10, right: 10, top: 5, bottom: 5 }}>
+      <LineChart data={lineData} margin={{ left: 10, right: 10, top: 5, bottom: 25 }}>
         <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
         <XAxis
           dataKey="income"
           type="number"
           niceTicks="snap125"
-          domain={[0, 'dataMax']}
+          domain={[0, 'auto']}
           tickFormatter={fmt}
-          tick={{ fontFamily: 'Inter, sans-serif', fontSize: 10 }}
-
+          tick={{ fontFamily: 'var(--font-sans)', fontSize: 10, fill: 'var(--foreground)' }}
+          label={{ value: 'Annual Income', position: 'insideBottom', offset: -18, style: { fontSize: 11, fill: 'var(--foreground)', opacity: 0.6 } }}
         />
         <YAxis
           niceTicks="snap125"
-          domain={[0, (dataMax: number) => Math.ceil(dataMax * 1.15 / 100) * 100]}
+          domain={[0, withHeadroom]}
           tickFormatter={fmt}
-          tick={{ fontFamily: 'Inter, sans-serif', fontSize: 10 }}
+          tick={{ fontFamily: 'var(--font-sans)', fontSize: 10, fill: 'var(--foreground)' }}
           width={55}
-          label={{ value: 'Benefit ($)', angle: -90, position: 'insideLeft', offset: 4, style: { fontSize: 11, fill: '#6B7280', textAnchor: 'middle' } }}
+          label={{ value: 'Benefit ($)', angle: -90, position: 'insideLeft', offset: 4, style: { fontSize: 11, fill: 'var(--foreground)', opacity: 0.6, textAnchor: 'middle' } }}
         />
         <Tooltip
           contentStyle={TOOLTIP_STYLE}
@@ -170,14 +174,6 @@ export function IncomeLineChart({
           formatter={(value, name) => {
             const ht = types.find((t) => t.value === name);
             return [fmt(Number(value)), ht?.label || String(name)];
-          }}
-        />
-        <Legend
-          wrapperStyle={{ fontSize: 10, paddingTop: 2 }}
-          iconSize={10}
-          formatter={(value) => {
-            const ht = types.find((t) => t.value === value);
-            return ht?.label || value;
           }}
         />
         {types.map((ht) => (
@@ -195,7 +191,7 @@ export function IncomeLineChart({
         {highlightIncome != null && (
           <ReferenceLine
             x={highlightIncome}
-            stroke="#374151"
+            stroke="var(--foreground)"
             strokeDasharray="4 3"
             strokeWidth={1}
           />
@@ -205,15 +201,15 @@ export function IncomeLineChart({
             x={highlightIncome}
             y={highlightBenefit}
             r={5}
-            fill="#1D4044"
-            stroke="#fff"
+            fill="var(--foreground)"
+            stroke="var(--background)"
             strokeWidth={2}
           >
             <Label
               value={fmt(highlightBenefit)}
               position="top"
-              offset={10}
-              style={{ fontSize: 12, fontWeight: 600, fill: '#1D4044' }}
+              offset={12}
+              style={{ fontSize: 12, fontWeight: 600, fill: 'var(--foreground)', stroke: 'var(--background)', strokeWidth: 3, paintOrder: 'stroke' }}
             />
           </ReferenceDot>
         )}
@@ -253,18 +249,18 @@ export function ExpenseLineChart({
           dataKey="expense"
           type="number"
           niceTicks="snap125"
-          domain={[0, 'dataMax']}
+          domain={[0, 'auto']}
           tickFormatter={fmt}
-          tick={{ fontFamily: 'Inter, sans-serif', fontSize: 10 }}
+          tick={{ fontFamily: 'var(--font-sans)', fontSize: 10, fill: 'var(--foreground)' }}
 
         />
         <YAxis
           niceTicks="snap125"
-          domain={[0, (dataMax: number) => Math.ceil(dataMax * 1.15 / 100) * 100]}
+          domain={[0, withHeadroom]}
           tickFormatter={fmt}
-          tick={{ fontFamily: 'Inter, sans-serif', fontSize: 10 }}
+          tick={{ fontFamily: 'var(--font-sans)', fontSize: 10, fill: 'var(--foreground)' }}
           width={55}
-          label={{ value: 'Benefit ($)', angle: -90, position: 'insideLeft', offset: 4, style: { fontSize: 11, fill: '#6B7280', textAnchor: 'middle' } }}
+          label={{ value: 'Benefit ($)', angle: -90, position: 'insideLeft', offset: 4, style: { fontSize: 11, fill: 'var(--foreground)', opacity: 0.6, textAnchor: 'middle' } }}
         />
         <Tooltip
           contentStyle={TOOLTIP_STYLE}
@@ -273,14 +269,6 @@ export function ExpenseLineChart({
           formatter={(value, name) => {
             const ht = types.find((t) => t.value === name);
             return [fmt(Number(value)), ht?.label || String(name)];
-          }}
-        />
-        <Legend
-          wrapperStyle={{ fontSize: 10, paddingTop: 2 }}
-          iconSize={10}
-          formatter={(value) => {
-            const ht = types.find((t) => t.value === value);
-            return ht?.label || value;
           }}
         />
         {types.map((ht) => (
@@ -298,7 +286,7 @@ export function ExpenseLineChart({
         {highlightExpense != null && (
           <ReferenceLine
             x={highlightExpense}
-            stroke="#374151"
+            stroke="var(--foreground)"
             strokeDasharray="4 3"
             strokeWidth={1}
           />
@@ -308,15 +296,15 @@ export function ExpenseLineChart({
             x={highlightExpense}
             y={highlightBenefit}
             r={5}
-            fill="#1D4044"
-            stroke="#fff"
+            fill="var(--foreground)"
+            stroke="var(--background)"
             strokeWidth={2}
           >
             <Label
               value={fmt(highlightBenefit)}
               position="top"
               offset={10}
-              style={{ fontSize: 12, fontWeight: 600, fill: '#1D4044' }}
+              style={{ fontSize: 12, fontWeight: 600, fill: 'var(--foreground)', stroke: 'var(--background)', strokeWidth: 3, paintOrder: 'stroke' }}
             />
           </ReferenceDot>
         )}
@@ -396,5 +384,190 @@ export function SizeIncome3DChart({
       style={{ width: '100%', height: `${height}px` }}
       useResizeHandler
     />
+  );
+}
+
+export function SizeLineChart({
+  state, income, heatingExpense, housingType, subsidized, data, highlightSize, highlightHeatingType,
+}: {
+  state: string;
+  income: number;
+  heatingExpense: number;
+  housingType?: string;
+  subsidized?: boolean;
+  data: LiheapData;
+  highlightSize?: number;
+  highlightHeatingType?: string;
+}) {
+  const types = CHART_HEATING_TYPES[state] || [];
+
+  const lineData = useMemo(
+    () => generateSizeLines({ state, income, heatingExpense, housingType, subsidized, data }),
+    [state, income, heatingExpense, housingType, subsidized, data],
+  );
+
+  const highlightBenefit = useMemo(() => {
+    if (highlightSize == null || !highlightHeatingType) return null;
+    return computeBenefit({
+      state, heatingType: highlightHeatingType, income,
+      heatingExpense, householdSize: highlightSize, housingType, subsidized,
+    }, data);
+  }, [state, highlightHeatingType, highlightSize, income, heatingExpense, housingType, subsidized, data]);
+
+  return (
+    <ResponsiveContainer width="100%" height="100%">
+      <LineChart data={lineData} margin={{ left: 10, right: 20, top: 5, bottom: 25 }}>
+        <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
+        <XAxis
+          dataKey="size"
+          type="number"
+          ticks={[1, 2, 3, 4, 5, 6]}
+          domain={[1, 6]}
+          allowDecimals={false}
+          tick={{ fontFamily: 'var(--font-sans)', fontSize: 10, fill: 'var(--foreground)' }}
+          label={{ value: 'Household Size', position: 'insideBottom', offset: -18, style: { fontSize: 11, fill: 'var(--foreground)', opacity: 0.6 } }}
+        />
+        <YAxis
+          niceTicks="snap125"
+          domain={[0, withHeadroom]}
+          tickFormatter={fmt}
+          tick={{ fontFamily: 'var(--font-sans)', fontSize: 10, fill: 'var(--foreground)' }}
+          width={55}
+          label={{ value: 'Benefit ($)', angle: -90, position: 'insideLeft', offset: 4, style: { fontSize: 11, fill: 'var(--foreground)', opacity: 0.6, textAnchor: 'middle' } }}
+        />
+        <Tooltip
+          contentStyle={TOOLTIP_STYLE}
+          separator=": "
+          labelFormatter={(v) => `Household size: ${v}`}
+          formatter={(value, name) => {
+            const ht = types.find((t) => t.value === name);
+            return [fmt(Number(value)), ht?.label || String(name)];
+          }}
+        />
+        {types.map((ht) => (
+          <Line
+            key={ht.value}
+            type="linear"
+            dataKey={ht.value}
+            stroke={ht.color}
+            strokeWidth={highlightHeatingType === ht.value ? 3 : 1.5}
+            strokeOpacity={highlightHeatingType && highlightHeatingType !== ht.value ? 0.35 : 1}
+            dot={false}
+            name={ht.value}
+          />
+        ))}
+        {highlightSize != null && (
+          <ReferenceLine x={highlightSize} stroke="var(--foreground)" strokeDasharray="4 3" strokeWidth={1} />
+        )}
+        {highlightSize != null && highlightBenefit != null && highlightHeatingType && (
+          <ReferenceDot
+            x={highlightSize}
+            y={highlightBenefit}
+            r={5}
+            fill="var(--foreground)"
+            stroke="var(--background)"
+            strokeWidth={2}
+          >
+            <Label
+              value={fmt(highlightBenefit)}
+              position="top"
+              offset={12}
+              style={{ fontSize: 12, fontWeight: 600, fill: 'var(--foreground)', stroke: 'var(--background)', strokeWidth: 3, paintOrder: 'stroke' }}
+            />
+          </ReferenceDot>
+        )}
+      </LineChart>
+    </ResponsiveContainer>
+  );
+}
+
+export function CoverageLineChart({
+  state, householdSize, housingType, subsidized, data, chartIncome,
+  highlightExpense, highlightHeatingType,
+}: Omit<ChartParams, 'heatingType'> & {
+  chartIncome: number;
+  highlightExpense?: number;
+  highlightHeatingType?: string;
+}) {
+  const types = CHART_HEATING_TYPES[state] || [];
+  const pctFmt = (v: number) => `${Math.round(v)}%`;
+
+  const lineData = useMemo(
+    () => generateCoverageLines({ state, householdSize, income: chartIncome, housingType, subsidized, data, highlightExpense }),
+    [state, householdSize, chartIncome, housingType, subsidized, data, highlightExpense],
+  );
+
+  const highlightCoverage = useMemo(() => {
+    if (highlightExpense == null || highlightExpense <= 0 || !highlightHeatingType) return null;
+    const benefit = computeBenefit({
+      state, heatingType: highlightHeatingType, income: chartIncome,
+      heatingExpense: highlightExpense, householdSize, housingType, subsidized,
+    }, data);
+    return Math.min(100, (benefit / highlightExpense) * 100);
+  }, [state, highlightHeatingType, highlightExpense, chartIncome, householdSize, housingType, subsidized, data]);
+
+  return (
+    <ResponsiveContainer width="100%" height="100%">
+      <LineChart data={lineData} margin={{ left: 10, right: 10, top: 5, bottom: 5 }}>
+        <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
+        <XAxis
+          dataKey="expense"
+          type="number"
+          niceTicks="snap125"
+          domain={[0, 'auto']}
+          tickFormatter={fmt}
+          tick={{ fontFamily: 'var(--font-sans)', fontSize: 10, fill: 'var(--foreground)' }}
+        />
+        <YAxis
+          niceTicks="snap125"
+          domain={[0, 100]}
+          tickFormatter={pctFmt}
+          tick={{ fontFamily: 'var(--font-sans)', fontSize: 10, fill: 'var(--foreground)' }}
+          width={45}
+          label={{ value: '% Covered', angle: -90, position: 'insideLeft', offset: 4, style: { fontSize: 11, fill: 'var(--foreground)', opacity: 0.6, textAnchor: 'middle' } }}
+        />
+        <Tooltip
+          contentStyle={TOOLTIP_STYLE}
+          separator=": "
+          labelFormatter={(v) => `Expense: ${fmt(v as number)}`}
+          formatter={(value, name) => {
+            const ht = types.find((t) => t.value === name);
+            return [pctFmt(Number(value)), ht?.label || String(name)];
+          }}
+        />
+        {types.map((ht) => (
+          <Line
+            key={ht.value}
+            type="linear"
+            dataKey={ht.value}
+            stroke={ht.color}
+            strokeWidth={highlightHeatingType === ht.value ? 3 : 1.5}
+            strokeOpacity={highlightHeatingType && highlightHeatingType !== ht.value ? 0.35 : 1}
+            dot={false}
+            name={ht.value}
+          />
+        ))}
+        {highlightExpense != null && (
+          <ReferenceLine x={highlightExpense} stroke="var(--foreground)" strokeDasharray="4 3" strokeWidth={1} />
+        )}
+        {highlightExpense != null && highlightCoverage != null && highlightHeatingType && (
+          <ReferenceDot
+            x={highlightExpense}
+            y={highlightCoverage}
+            r={5}
+            fill="var(--foreground)"
+            stroke="var(--background)"
+            strokeWidth={2}
+          >
+            <Label
+              value={pctFmt(highlightCoverage)}
+              position="top"
+              offset={10}
+              style={{ fontSize: 12, fontWeight: 600, fill: 'var(--foreground)', stroke: 'var(--background)', strokeWidth: 3, paintOrder: 'stroke' }}
+            />
+          </ReferenceDot>
+        )}
+      </LineChart>
+    </ResponsiveContainer>
   );
 }
