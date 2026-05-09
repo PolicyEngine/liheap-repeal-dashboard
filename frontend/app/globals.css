@@ -1,6 +1,20 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@import "@policyengine/ui-kit/theme.css";
+
+/* Project-specific palette preserved via Tailwind v4 @theme.
+   Existing components reference primary-500/600/700/800. */
+@theme {
+  --color-primary-50: #E6FFFA;
+  --color-primary-100: #B2F5EA;
+  --color-primary-200: #81E6D9;
+  --color-primary-300: #4FD1C5;
+  --color-primary-400: #38B2AC;
+  --color-primary-500: #319795;
+  --color-primary-600: #2C7A7B;
+  --color-primary-700: #285E61;
+  --color-primary-800: #234E52;
+  --color-primary-900: #1D4044;
+}
 
 :root {
   --chart-1: #0891B2;
@@ -10,8 +24,6 @@
   --chart-5: #7C3AED;
   --chart-6: #D53F8C;
   --border: #E2E8F0;
-  --background: #FFFFFF;
-  --foreground: #1A202C;
 }
 
 body {
