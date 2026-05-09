@@ -5,6 +5,7 @@ const basePath =
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  output: 'export',
   basePath,
   assetPrefix: basePath || undefined,
   images: { unoptimized: true },
