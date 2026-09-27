@@ -14,6 +14,8 @@ import numpy as np
 from pathlib import Path
 from policyengine_us import Microsimulation
 
+from intra_decile import intra_decile_distribution
+
 BASELINE_YEAR = 2024
 REPEAL_YEAR = 2027
 OUTPUT_DIR = Path(__file__).parent.parent / "frontend" / "public" / "data"
@@ -40,16 +42,6 @@ STATES = {
 }
 # Actual data source: ACF LIHEAP FY2024 State Profiles (heating assistance only)
 # https://liheappm.acf.gov/sites/default/files/private/congress/profiles/2024/
-
-_INTRA_BOUNDS = [-np.inf, -0.05, -1e-3, 1e-3, 0.05, np.inf]
-_INTRA_KEYS = [
-    "lose_more_than_5pct",
-    "lose_less_than_5pct",
-    "no_change",
-    "gain_less_than_5pct",
-    "gain_more_than_5pct",
-]
-
 
 def _poverty_metrics(baseline_rate, reform_rate):
     """Return rate change and percent change for a poverty metric."""
@@ -218,26 +210,9 @@ def calculate_state_impact(state, config):
     capped_baseline = baseline_net_income.clip(lower=1)
     rel_change = income_change / capped_baseline
 
-    intra_decile_deciles = {key: [] for key in _INTRA_KEYS}
-    for d in range(1, 11):
-        dmask = decile == d
-        d_total_people = float((people_per_hh * dmask).sum())
-
-        for lower, upper, key in zip(
-            _INTRA_BOUNDS[:-1], _INTRA_BOUNDS[1:], _INTRA_KEYS
-        ):
-            bucket_mask = dmask & (rel_change > lower) & (rel_change <= upper)
-            bucket_people = float((people_per_hh * bucket_mask).sum())
-            proportion = (
-                bucket_people / d_total_people
-                if d_total_people > 0
-                else 0.0
-            )
-            intra_decile_deciles[key].append(proportion)
-
-    intra_decile_all = {
-        key: sum(intra_decile_deciles[key]) / 10 for key in _INTRA_KEYS
-    }
+    intra_decile_all, intra_decile_deciles = intra_decile_distribution(
+        rel_change, decile, people_per_hh
+    )
 
     # ===== INCOME BRACKET BREAKDOWN =====
     income_brackets = [
