@@ -68,7 +68,7 @@ PYTHONPATH=/tmp/pe-main /tmp/pe-venv/bin/python scripts/generate_liheap_grids.py
 PYTHONPATH=/tmp/pe-main /tmp/pe-venv/bin/python scripts/generate_liheap_grids.py --year 2026
 ```
 
-Each year takes about an hour in one process and peaks near 3 GB of memory. The model version is written into every file and shown on the page. `scripts/check_liheap_grids.py` scans the files for results worth a second look.
+Each year takes about an hour in one process and peaks near 4 GB of memory. The model version is written into every file and shown on the page. `scripts/check_liheap_grids.py` scans the files for results worth a second look.
 
 ## Aggregate Impact Data
 
