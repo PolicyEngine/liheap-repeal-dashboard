@@ -1,4 +1,22 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { YEARS } from '@/lib/liheapGrid';
+
+const BASE_PATH =
+  process.env.NEXT_PUBLIC_BASE_PATH ||
+  (process.env.NODE_ENV === 'production' ? '/liheap-repeal-dashboard' : '');
+
 export default function PolicyOverview({ onTabChange }: { onTabChange?: (tab: string) => void }) {
+  const [modelVersion, setModelVersion] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch(`${BASE_PATH}/data/liheap/${YEARS[0].value}/index.json`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((index) => setModelVersion(index?.model?.version ?? null))
+      .catch(() => setModelVersion(null));
+  }, []);
+
   return (
     <section className="space-y-6">
       {/* What is LIHEAP */}
@@ -21,15 +39,50 @@ export default function PolicyOverview({ onTabChange }: { onTabChange?: (tab: st
       <div className="space-y-3">
         <h2 className="text-2xl font-bold text-gray-900">How the calculator works</h2>
         <p className="text-gray-700 leading-relaxed">
-          Enter your household details — state, income, household size, and heating source — and this
-          tool estimates your LIHEAP eligibility and benefit amount. It currently covers
-          <strong> Washington DC</strong>, <strong>Massachusetts</strong>, and <strong>Illinois</strong>,
-          the three states where PolicyEngine has detailed LIHEAP payment models.
+          Choose a state, a household, an income and a heating source, and the calculator shows
+          the regular LIHEAP payment that PolicyEngine&apos;s model computes, in
+          <strong> all 50 states and DC</strong>. The charts show how the payment changes with
+          income and household size for each heating source.
         </p>
         <ul className="list-disc ml-5 space-y-1.5 text-gray-600 text-sm">
-          <li>Calculations run against the <a href="https://policyengine.org/us/api" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">PolicyEngine API</a>, which models each state&apos;s specific payment schedule and eligibility rules.</li>
-          <li>Benefits are based on heating fuel type, household size, and income relative to state thresholds.</li>
-          <li>Results are estimates — actual benefits may differ due to administrative factors, funding availability, and documentation requirements.</li>
+          <li>
+            Every amount is one run of the{' '}
+            <a href="https://github.com/PolicyEngine/policyengine-us" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">policyengine-us</a>{' '}
+            model{modelVersion ? ` (version ${modelVersion})` : ''} for that exact household, computed ahead of time.
+            The calculator does not estimate between runs, so income moves in $500 steps and
+            yearly bills in ten levels from $300 to $5,000.
+          </li>
+          <li>
+            Adults are 40 and children are 10, and all income is one adult&apos;s wages. No one is 60 or
+            older, under 6 or disabled; many states pay more to households with such a member.
+          </li>
+          <li>
+            The model also works out the household&apos;s other benefits. Where a state counts cash
+            assistance (TANF) or SSI as income, or accepts SNAP, TANF or SSI as proof of eligibility,
+            the LIHEAP amount reflects it, so a payment can step up at the income where TANF ends.
+          </li>
+          <li>
+            A home not heated with electricity also has a $1,500 yearly electric bill. Heat
+            included in rent assumes natural gas heat and $12,000 of yearly rent.
+          </li>
+          <li>
+            Where benefits vary by county, the state&apos;s most populous county is used. Alaska uses
+            Anchorage.
+          </li>
+          <li>
+            Seven states with a separate cooling benefit (Alabama, Arkansas, Georgia, Kentucky,
+            Louisiana, Oklahoma and South Carolina) offer a &quot;Pays for cooling&quot; option. Nebraska,
+            New Jersey and Virginia pay cooling only to households with an older, very young,
+            disabled or medically certified member, so no cooling amount appears for them.
+          </li>
+          <li>
+            Michigan shows its Home Heating Credit, the state&apos;s regular heating help. In Hawaii the
+            model pays only households in subsidized housing for now, so amounts are $0.
+          </li>
+          <li>
+            Amounts are regular heating and cooling payments. Crisis assistance, weatherization and
+            equipment are not included, and actual benefits depend on funding and documentation.
+          </li>
         </ul>
         <button
           onClick={() => onTabChange?.('calculator')}

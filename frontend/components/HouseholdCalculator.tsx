@@ -1,372 +1,293 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Surface3DChart, SizeIncome3DChart, IncomeLineChart, SizeLineChart } from './BenefitCharts';
-import type { LiheapData } from '@/lib/liheapData';
-import { FALLBACK_LIHEAP_DATA, computeBenefit, isEligible, CHART_HEATING_TYPES } from '@/lib/liheapData';
+import type { Selection, StateGrid } from '@/lib/liheapGrid';
+import {
+  STATES, YEARS, ELECTRICITY, NO_HEATING,
+  fuelUsesBill, loadStateGrid, lookup, maxIncome, snapExpense, snapIncome,
+} from '@/lib/liheapGrid';
 
-const STATES = [
-  { code: 'DC', label: 'Washington DC' },
-  { code: 'MA', label: 'Massachusetts' },
-  { code: 'IL', label: 'Illinois' },
-];
-
-const HEATING_SOURCES: Record<string, { label: string; value: string }[]> = {
-  DC: [
-    { label: 'Electricity', value: 'ELECTRICITY' },
-    { label: 'Natural Gas', value: 'GAS' },
-    { label: 'Oil', value: 'OIL' },
-    { label: 'Heat included in rent', value: 'HEAT_IN_RENT' },
-  ],
-  MA: [
-    { label: 'Electricity', value: 'ELECTRICITY' },
-    { label: 'Natural Gas', value: 'NATURAL_GAS' },
-    { label: 'Heating Oil / Propane', value: 'HEATING_OIL_AND_PROPANE' },
-    { label: 'Kerosene', value: 'KEROSENE' },
-    { label: 'Other', value: 'OTHER' },
-    { label: 'Heat included in rent', value: 'HEAT_IN_RENT' },
-  ],
-  IL: [
-    { label: 'All Electric', value: 'ALL_ELECTRIC' },
-    { label: 'Natural Gas', value: 'NAT_GAS_OTHER' },
-    { label: 'Propane / Fuel Oil', value: 'PROPANE_FUEL_OIL' },
-    { label: 'Heat included in rent', value: 'CASH' },
-  ],
-};
+const fmt = (v: number) =>
+  v.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+const fmtInt = (v: number) => v.toLocaleString('en-US');
+const parseInput = (s: string) => Number(s.replace(/[^0-9]/g, '')) || 0;
 
 export default function HouseholdCalculator() {
   const [state, setState] = useState('DC');
+  const [year, setYear] = useState(YEARS[0].value);
   const [nAdults, setNAdults] = useState(1);
   const [nChildren, setNChildren] = useState(0);
-  const [income, setIncome] = useState(20000);
-  const [heatingSource, setHeatingSource] = useState('ELECTRICITY');
-  const [heatingExpense, setHeatingExpense] = useState(1800);
-  const [rent, setRent] = useState(0);
-  const [dcHousingType, setDcHousingType] = useState('MULTI_FAMILY');
-  const [receivesHousingAssistance, setReceivesHousingAssistance] = useState(false);
-  const [heatingExpenseLastYear, setHeatingExpenseLastYear] = useState(0);
+  const [incomeInput, setIncomeInput] = useState(20000);
+  const [fuelInput, setFuelInput] = useState(ELECTRICITY);
+  const [expenseInput, setExpenseInput] = useState(1500);
+  const [variantInput, setVariantInput] = useState(0);
+  const [coolingInput, setCoolingInput] = useState(false);
 
+  const [loaded, setLoaded] = useState<{ key: string; grid: StateGrid | null; error: string | null } | null>(null);
   const [hasCalculated, setHasCalculated] = useState(false);
-
-  const [liheapData] = useState<LiheapData>(FALLBACK_LIHEAP_DATA);
   const [leftIs3d, setLeftIs3d] = useState(false);
   const [rightIs3d, setRightIs3d] = useState(false);
 
-  const isHeatInRent = heatingSource === 'HEAT_IN_RENT' || heatingSource === 'CASH';
-  const householdSize = nAdults + nChildren;
+  const key = `${year}/${state}`;
+  useEffect(() => {
+    let current = true;
+    loadStateGrid(year, state)
+      .then((grid) => { if (current) setLoaded({ key, grid, error: null }); })
+      .catch((error: Error) => {
+        if (current) setLoaded({ key, grid: null, error: error.message });
+      });
+    return () => { current = false; };
+  }, [year, state, key]);
 
-  // Local instant computation — updates as inputs change
-  const localEligible = isEligible(state, income, householdSize, liheapData);
-  const localBenefit = localEligible ? computeBenefit({
-    state, heatingType: heatingSource, income,
-    heatingExpense: isHeatInRent ? 99999 : heatingExpense,
-    householdSize, housingType: dcHousingType, subsidized: receivesHousingAssistance,
-  }, liheapData) : 0;
+  // Results for another state or year are never shown while a new file loads.
+  const grid = loaded?.key === key ? loaded.grid : null;
+  const loadError = loaded?.key === key ? loaded.error : null;
+  const ready = grid !== null;
 
-  function handleStateChange(newState: string) {
-    setState(newState);
-    setHeatingSource(HEATING_SOURCES[newState][0].value);
-  }
+  // Inputs are limited to the households that were run for this state.
+  const fuel = ready && grid.fuels.some((f) => f.value === fuelInput) ? fuelInput : ELECTRICITY;
+  const selection: Selection | null = ready
+    ? {
+        adults: nAdults,
+        children: nChildren,
+        variant: Math.min(variantInput, grid.variants.length - 1),
+        cooling: grid.coolingToggle && (coolingInput || fuel === NO_HEATING),
+        fuel,
+        expense: snapExpense(grid, expenseInput),
+        income: snapIncome(grid, incomeInput),
+      }
+    : null;
+  const result = ready && selection ? lookup(grid, selection) : null;
 
-  function calculate() {
-    setHasCalculated(true);
-  }
-
-  const fmt = (v: number) =>
-    v.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
-
-  // Format number with commas for display; parse by stripping non-digits
-  const fmtInt = (v: number) => v.toLocaleString('en-US');
-  const parseInput = (s: string) => Number(s.replace(/[^0-9]/g, '')) || 0;
+  const usesBill = fuelUsesBill(fuel);
+  const billIsElectric = fuel === ELECTRICITY || fuel === NO_HEATING;
+  const heatingPart = result ? result.benefit - result.coolingPart : 0;
+  const isMichigan = state === 'MI';
+  const incomeAboveRange = ready && incomeInput > maxIncome(grid);
 
   return (
     <section id="calculator" className="flex flex-col gap-3 xl:h-[calc(100vh-7rem)]">
       {/* ── Top bar: inputs + result ── */}
       <div className="rounded-lg border border-gray-200 bg-white px-5 py-3">
         <div className="flex items-end gap-x-3 gap-y-2 flex-wrap">
-          <Field label="State" grow>
-            <select value={state} onChange={e => handleStateChange(e.target.value)}
+          <Field label="State" grow htmlFor="state">
+            <select id="state" value={state} onChange={(e) => setState(e.target.value)}
               className="field-input w-full">
-              {STATES.map(s => <option key={s.code} value={s.code}>{s.label}</option>)}
+              {STATES.map((s) => <option key={s.code} value={s.code}>{s.name}</option>)}
             </select>
           </Field>
 
-          <Field label="Marital Status">
-            <select value={nAdults} onChange={e => setNAdults(Number(e.target.value))}
-              className="field-input w-full min-w-[6rem]">
+          <Field label="Program year" htmlFor="year">
+            <select id="year" value={year} onChange={(e) => setYear(Number(e.target.value))}
+              className="field-input w-full">
+              {YEARS.map((y) => <option key={y.value} value={y.value}>{y.label}</option>)}
+            </select>
+          </Field>
+
+          <Field label="Marital status" htmlFor="adults">
+            <select id="adults" value={nAdults} onChange={(e) => setNAdults(Number(e.target.value))}
+              className="field-input w-full">
               <option value={1}>Single</option>
               <option value={2}>Married</option>
             </select>
           </Field>
 
-          <Field label="Children">
-            <select value={nChildren} onChange={e => setNChildren(Number(e.target.value))}
-              className="field-input w-full min-w-[4.5rem]">
-              {[0, 1, 2, 3, 4, 5, 6].map(n => <option key={n} value={n}>{n}</option>)}
+          <Field label="Children" htmlFor="children">
+            <select id="children" value={nChildren} onChange={(e) => setNChildren(Number(e.target.value))}
+              className="field-input w-full">
+              {[0, 1, 2, 3, 4, 5, 6].map((n) => <option key={n} value={n}>{n}</option>)}
             </select>
           </Field>
 
-          <Field label="Annual Income" grow>
+          <Field label="Annual income" grow htmlFor="income">
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
-              <input type="text" inputMode="numeric" value={fmtInt(income)}
-                onChange={e => setIncome(parseInput(e.target.value))}
+              <input id="income" type="text" inputMode="numeric" value={fmtInt(incomeInput)}
+                onChange={(e) => setIncomeInput(parseInput(e.target.value))}
+                onBlur={() => { if (ready) setIncomeInput(snapIncome(grid, incomeInput)); }}
                 className="field-input field-input-dollar w-full" />
             </div>
           </Field>
 
-          <Field label="Heating" grow>
-            <select value={heatingSource} onChange={e => setHeatingSource(e.target.value)}
+          <Field label="Heating" grow htmlFor="fuel">
+            <select id="fuel" value={fuel} onChange={(e) => setFuelInput(e.target.value)}
               className="field-input w-full">
-              {(HEATING_SOURCES[state] || []).map(h => (
-                <option key={h.value} value={h.value}>{h.label}</option>
+              {(ready ? grid.fuels : [{ value: ELECTRICITY, label: 'Electricity' }]).map((f) => (
+                <option key={f.value} value={f.value}>{f.label}</option>
               ))}
             </select>
           </Field>
 
-          {!isHeatInRent && (
-            <Field label="Expense/yr" grow>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
-                <input type="text" inputMode="numeric" value={fmtInt(heatingExpense)}
-                  onChange={e => setHeatingExpense(parseInput(e.target.value))}
-                  className="field-input field-input-dollar w-full" />
-              </div>
-            </Field>
-          )}
-
-          {state === 'DC' && (
-            <Field label="Housing" grow>
-              <select value={dcHousingType} onChange={e => setDcHousingType(e.target.value)}
+          {usesBill && (
+            <Field label={billIsElectric ? 'Electric bill/yr' : 'Heating bill/yr'} htmlFor="expense">
+              <select id="expense" value={selection?.expense ?? expenseInput}
+                onChange={(e) => setExpenseInput(Number(e.target.value))}
                 className="field-input w-full">
-                <option value="SINGLE_FAMILY">Single Family</option>
-                <option value="MULTI_FAMILY">Multi Family</option>
+                {(ready ? grid.expenses : [expenseInput]).map((e) => (
+                  <option key={e} value={e}>{fmt(e)}</option>
+                ))}
               </select>
             </Field>
           )}
 
-          {(isHeatInRent || state === 'IL') && (
-            <Field label="Rent/yr" grow>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
-                <input type="text" inputMode="numeric" value={fmtInt(rent)}
-                  onChange={e => setRent(parseInput(e.target.value))}
-                  className="field-input field-input-dollar w-full" />
-              </div>
+          {ready && grid.variants.length > 1 && (
+            <Field label={grid.variantLabel} htmlFor="variant">
+              <select id="variant" value={selection?.variant ?? 0}
+                onChange={(e) => setVariantInput(Number(e.target.value))}
+                className="field-input w-full">
+                {grid.variants.map((v, i) => <option key={v.value} value={i}>{v.label}</option>)}
+              </select>
             </Field>
           )}
 
-          {state === 'MA' && (
-            <>
-              <Field label="Subsidized">
-                <label className="flex items-center h-[38px]">
-                  <input type="checkbox" checked={receivesHousingAssistance}
-                    onChange={e => setReceivesHousingAssistance(e.target.checked)}
-                    className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
-                </label>
-              </Field>
-              <Field label="Prior yr exp" grow>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
-                  <input type="text" inputMode="numeric"
-                    value={heatingExpenseLastYear ? fmtInt(heatingExpenseLastYear) : ''}
-                    placeholder="0"
-                    onChange={e => setHeatingExpenseLastYear(parseInput(e.target.value))}
-                    className="field-input field-input-dollar w-full" />
-                </div>
-              </Field>
-            </>
+          {ready && grid.coolingToggle && (
+            <Field label="Pays for cooling" htmlFor="cooling">
+              <label className="flex items-center h-[38px]">
+                <input id="cooling" type="checkbox"
+                  checked={selection?.cooling ?? false}
+                  disabled={fuel === NO_HEATING}
+                  onChange={(e) => setCoolingInput(e.target.checked)}
+                  className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
+              </label>
+            </Field>
           )}
 
-          <button onClick={calculate}
+          <button onClick={() => setHasCalculated(true)}
             aria-label="Calculate LIHEAP benefit estimate"
             className="h-[38px] bg-primary-600 text-white px-6 rounded-md text-sm font-medium hover:bg-primary-700 transition-colors whitespace-nowrap shrink-0">
             Calculate
           </button>
         </div>
 
-        {/* Result row — local computation, updates instantly after first Calculate */}
-        {hasCalculated && (
-          <div className="mt-3 pt-3 border-t border-gray-100 flex items-center gap-4 flex-wrap">
-            {/* Eligibility pill */}
+        {/* Result row: a lookup of the model run for these inputs */}
+        {hasCalculated && result && selection && ready && (
+          <div className="mt-3 pt-3 border-t border-gray-100 flex items-center gap-x-4 gap-y-2 flex-wrap">
             <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold border ${
-              localEligible
+              result.eligible
                 ? 'bg-green-50 text-green-700 border-green-200'
                 : 'bg-gray-50 text-gray-500 border-gray-200'
             }`}>
-              <span className={`w-2 h-2 rounded-full ${localEligible ? 'bg-green-500' : 'bg-gray-400'}`} />
-              {localEligible ? 'Eligible' : 'Not Eligible'}
+              <span className={`w-2 h-2 rounded-full ${result.eligible ? 'bg-green-500' : 'bg-gray-400'}`} />
+              {result.eligible ? 'Eligible' : 'Not eligible'}
             </div>
 
-            {/* Hero benefit amount */}
-            {localEligible && (
+            {result.eligible && (
               <div className="flex items-baseline gap-2 ml-4">
-                <span className="text-3xl font-bold text-primary-700 leading-none">{fmt(localBenefit)}</span>
-                <span className="text-sm text-gray-500">annual heating benefit</span>
+                <span className="text-3xl font-bold text-primary-700 leading-none">{fmt(result.benefit)}</span>
+                <span className="text-sm text-gray-500">
+                  {isMichigan ? 'annual Home Heating Credit' : 'annual LIHEAP benefit'}
+                </span>
               </div>
             )}
 
-            {/* Coverage % */}
-            {localEligible && !isHeatInRent && heatingExpense > 0 && (
+            {result.eligible && result.coolingPart > 0 && (
+              <div className="text-sm text-gray-600 ml-2">
+                {fmt(heatingPart)} heating + {fmt(result.coolingPart)} cooling
+              </div>
+            )}
+
+            {result.eligible && usesBill && selection.expense > 0 && (
               <div className="flex items-baseline gap-2 ml-4 pl-4 border-l border-gray-200">
                 <span className="text-2xl font-bold text-gray-700 leading-none">
-                  {Math.round(Math.min(100, (localBenefit / heatingExpense) * 100))}%
+                  {Math.round(Math.min(100, ((fuel === NO_HEATING ? result.benefit : heatingPart) / selection.expense) * 100))}%
                 </span>
-                <span className="text-sm text-gray-500">of your heating bill</span>
+                <span className="text-sm text-gray-500">
+                  of this {billIsElectric ? 'electric' : 'heating'} bill
+                </span>
               </div>
             )}
 
-            {/* Disclaimer */}
-            <p className="text-[11px] text-gray-400 ml-auto whitespace-nowrap">
-              Heating assistance only — excludes cooling, crisis &amp; weatherization
+            <p className="text-[11px] text-gray-400 ml-auto">
+              At {fmt(selection.income)} income
+              {incomeAboveRange ? ` (the highest income run for ${grid.name})` : ''}
+              {grid.county ? ` · ${grid.county}` : ''}
+              {grid.place ? ` · ${grid.place}` : ''}
+              {' '}· regular payments only, no crisis or weatherization
             </p>
           </div>
+        )}
+        {loadError && (
+          <p className="mt-3 pt-3 border-t border-gray-100 text-sm text-red-700">
+            Could not load the data for this state. {loadError}
+          </p>
         )}
       </div>
 
       {/* ── Charts: full width, equal split ── */}
-      {!hasCalculated ? (
+      {!hasCalculated || !ready || !selection ? (
         <div className="flex min-h-[18rem] flex-1 items-center justify-center rounded-lg border-2 border-dashed border-gray-200 bg-white xl:min-h-0">
           <div className="text-center">
-            <p className="text-gray-400 text-sm">Enter your household details above and click <strong>Calculate</strong></p>
-            <p className="text-gray-300 text-xs mt-1">to see your estimated LIHEAP benefit and explore the benefit structure</p>
+            {hasCalculated && !loadError ? (
+              <p className="text-gray-400 text-sm">Loading…</p>
+            ) : (
+              <>
+                <p className="text-gray-400 text-sm">Enter your household details above and click <strong>Calculate</strong></p>
+                <p className="text-gray-300 text-xs mt-1">to see your estimated LIHEAP benefit and explore the benefit structure</p>
+              </>
+            )}
           </div>
         </div>
       ) : (
-      <div className="flex flex-1 min-h-0 flex-col gap-2">
-        {/* Shared heating type legend */}
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2 rounded-lg border border-gray-200 bg-white">
-          <span className="text-[11px] text-gray-500 font-medium">Heating:</span>
-          {(CHART_HEATING_TYPES[state] || []).map((ht) => {
-            const isSelected = heatingSource === ht.value;
-            return (
-              <div key={ht.value} className={`flex items-center gap-1.5 text-[11px] transition-opacity ${isSelected ? 'font-semibold' : 'opacity-60'}`}>
-                <span
-                  className="inline-block rounded-full"
-                  style={{
-                    width: isSelected ? 12 : 10,
-                    height: isSelected ? 3 : 2,
-                    background: ht.color,
-                  }}
-                />
-                <span className="text-gray-700">{ht.label}</span>
-              </div>
-            );
-          })}
-        </div>
+        <div className="grid flex-1 min-h-0 grid-cols-1 gap-3 xl:grid-cols-2">
+          {/* Left panel: by income (2D) / income × bill surface (3D) */}
+          <Panel
+            title={leftIs3d ? 'Income × bill surface' : 'Benefit by income'}
+            detail={leftIs3d || !usesBill ? '' : ` — at a ${fmt(selection.expense)}/yr bill`}
+            is3d={leftIs3d}
+            onToggle={() => setLeftIs3d(!leftIs3d)}
+          >
+            {leftIs3d
+              ? <Surface3DChart grid={grid} selection={selection} />
+              : <IncomeLineChart grid={grid} selection={selection} highlight={result?.eligible ?? false} />}
+          </Panel>
 
-      <div className="grid flex-1 min-h-0 grid-cols-1 gap-3 xl:grid-cols-2">
-        {/* Left panel: Income (2D) / Income×Expense surface (3D) */}
-        <div className="flex min-h-[24rem] flex-col rounded-lg border border-gray-200 bg-white p-3 xl:min-h-0">
-          <div className="flex items-center justify-between mb-1">
-            <p className="text-sm font-semibold text-gray-700">
-              {leftIs3d ? 'Income x Expense Surface' : 'Benefit by Income'}
-              <span className="text-gray-400 font-normal">
-                {leftIs3d ? '' : ` — at ${fmt(isHeatInRent ? 0 : heatingExpense)}/yr expense`}
-              </span>
-            </p>
-            <button
-              onClick={() => setLeftIs3d(!leftIs3d)}
-              className={`px-2 py-0.5 rounded text-[10px] font-medium border transition-colors ${
-                leftIs3d
-                  ? 'bg-gray-800 text-white border-gray-800'
-                  : 'bg-white text-gray-500 border-gray-300 hover:border-gray-400'
-              }`}
-            >
-              {leftIs3d ? '2D' : '3D'}
-            </button>
-          </div>
-          <div className="flex-1 min-h-0">
-            {liheapData ? (
-              leftIs3d ? (
-                <Surface3DChart
-                  state={state}
-                  heatingType={heatingSource}
-                  householdSize={householdSize}
-                  housingType={dcHousingType}
-                  subsidized={receivesHousingAssistance}
-                  data={liheapData}
-                />
-              ) : (
-                <IncomeLineChart
-                  state={state}
-                  householdSize={householdSize}
-                  housingType={dcHousingType}
-                  subsidized={receivesHousingAssistance}
-                  chartExpense={isHeatInRent ? 99999 : heatingExpense}
-                  data={liheapData}
-                  highlightIncome={localEligible ? income : undefined}
-                  highlightHeatingType={localEligible ? heatingSource : undefined}
-                />
-              )
-            ) : (
-              <div className="flex items-center justify-center h-full">
-                <p className="text-xs text-gray-400">Loading...</p>
-              </div>
-            )}
-          </div>
+          {/* Right panel: by household size (2D) / income × size surface (3D) */}
+          <Panel
+            title={rightIs3d ? 'Income × household size surface' : 'Benefit by household size'}
+            detail={rightIs3d ? '' : ` — at ${fmt(selection.income)}/yr income`}
+            is3d={rightIs3d}
+            onToggle={() => setRightIs3d(!rightIs3d)}
+          >
+            {rightIs3d
+              ? <SizeIncome3DChart grid={grid} selection={selection} />
+              : <SizeLineChart grid={grid} selection={selection} highlight={result?.eligible ?? false} />}
+          </Panel>
         </div>
-
-        {/* Right panel: Benefit by Household Size (2D) / Income×Size surface (3D) */}
-        <div className="flex min-h-[24rem] flex-col rounded-lg border border-gray-200 bg-white p-3 xl:min-h-0">
-          <div className="flex items-center justify-between mb-1">
-            <p className="text-sm font-semibold text-gray-700">
-              {rightIs3d ? 'Income x Household Size Surface' : 'Benefit by Household Size'}
-              <span className="text-gray-400 font-normal">
-                {rightIs3d ? '' : ` — at ${fmt(income)}/yr income`}
-              </span>
-            </p>
-            <button
-              onClick={() => setRightIs3d(!rightIs3d)}
-              className={`px-2 py-0.5 rounded text-[10px] font-medium border transition-colors ${
-                rightIs3d
-                  ? 'bg-gray-800 text-white border-gray-800'
-                  : 'bg-white text-gray-500 border-gray-300 hover:border-gray-400'
-              }`}
-            >
-              {rightIs3d ? '2D' : '3D'}
-            </button>
-          </div>
-          <div className="flex-1 min-h-0">
-            {liheapData ? (
-              rightIs3d ? (
-                <SizeIncome3DChart
-                  state={state}
-                  heatingType={heatingSource}
-                  housingType={dcHousingType}
-                  subsidized={receivesHousingAssistance}
-                  heatingExpense={isHeatInRent ? 99999 : heatingExpense}
-                  data={liheapData}
-                />
-              ) : (
-                <SizeLineChart
-                  state={state}
-                  income={income}
-                  heatingExpense={isHeatInRent ? 99999 : heatingExpense}
-                  housingType={dcHousingType}
-                  subsidized={receivesHousingAssistance}
-                  data={liheapData}
-                  highlightSize={localEligible ? householdSize : undefined}
-                  highlightHeatingType={localEligible ? heatingSource : undefined}
-                />
-              )
-            ) : (
-              <div className="flex items-center justify-center h-full">
-                <p className="text-xs text-gray-400">Loading...</p>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-      </div>
       )}
     </section>
   );
 }
 
+function Panel({
+  title, detail, is3d, onToggle, children,
+}: { title: string; detail: string; is3d: boolean; onToggle: () => void; children: React.ReactNode }) {
+  return (
+    <div className="flex min-h-[24rem] flex-col rounded-lg border border-gray-200 bg-white p-3 xl:min-h-0">
+      <div className="flex items-center justify-between mb-1">
+        <p className="text-sm font-semibold text-gray-700">
+          {title}
+          <span className="text-gray-400 font-normal">{detail}</span>
+        </p>
+        <button
+          onClick={onToggle}
+          className={`px-2 py-0.5 rounded text-[10px] font-medium border transition-colors ${
+            is3d
+              ? 'bg-gray-800 text-white border-gray-800'
+              : 'bg-white text-gray-500 border-gray-300 hover:border-gray-400'
+          }`}
+        >
+          {is3d ? '2D' : '3D'}
+        </button>
+      </div>
+      <div className="flex-1 min-h-0">{children}</div>
+    </div>
+  );
+}
+
 function Field({ label, children, grow, htmlFor }: { label: string; children: React.ReactNode; grow?: boolean; htmlFor?: string }) {
   return (
-    <div className={grow ? 'flex-1 min-w-0' : ''}>
+    <div className={grow ? 'flex-1 min-w-[9.5rem]' : 'min-w-[6.5rem]'}>
       <label htmlFor={htmlFor} className="block text-xs font-medium text-gray-500 mb-1">{label}</label>
       {children}
     </div>
