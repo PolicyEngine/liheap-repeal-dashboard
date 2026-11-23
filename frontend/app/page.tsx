@@ -4,11 +4,13 @@ import { useState } from 'react';
 import Header from '@/components/Header';
 import PolicyOverview from '@/components/PolicyOverview';
 import HouseholdCalculator from '@/components/HouseholdCalculator';
+import StateComparison from '@/components/StateComparison';
 import Footer from '@/components/Footer';
 
 const TABS = [
   { key: 'overview', label: 'How it works' },
   { key: 'calculator', label: 'Household calculator' },
+  { key: 'compare', label: 'Compare states' },
 ] as const;
 
 type TabKey = (typeof TABS)[number]['key'];
@@ -20,7 +22,7 @@ export default function Home() {
     <div className="min-h-screen flex flex-col">
       <Header />
       <main className="flex-1 w-full px-4 sm:px-6 py-8">
-        <div className={activeTab === 'calculator' ? 'max-w-7xl mx-auto' : 'max-w-5xl mx-auto'}>
+        <div className={activeTab === 'overview' ? 'max-w-5xl mx-auto' : 'max-w-7xl mx-auto'}>
           {/* Tab navigation */}
           <nav aria-label="Main sections" className="mb-8 flex flex-wrap gap-2" role="tablist">
             {TABS.map((tab) => (
@@ -51,6 +53,7 @@ export default function Home() {
           >
             {activeTab === 'overview' && <PolicyOverview onTabChange={(tab) => setActiveTab(tab as TabKey)} />}
             {activeTab === 'calculator' && <HouseholdCalculator />}
+            {activeTab === 'compare' && <StateComparison />}
           </div>
         </div>
       </main>

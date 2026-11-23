@@ -8,7 +8,7 @@ export default function Header() {
           <abbr title="Low Income Home Energy Assistance Program" className="no-underline">
             LIHEAP
           </abbr>{' '}
-          eligibility and benefit amount for DC, Massachusetts, and Illinois
+          eligibility and benefit amount in all 50 states and DC
         </p>
       </div>
     </header>

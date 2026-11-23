@@ -16,7 +16,7 @@ const SITE_URL = 'https://policyengine.github.io/liheap-repeal-dashboard';
 const SITE_TITLE =
   'LIHEAP Benefit Calculator | Estimate Your Heating Assistance | PolicyEngine';
 const SITE_DESCRIPTION =
-  'Free LIHEAP benefit calculator — estimate your Low Income Home Energy Assistance Program eligibility and heating benefit amount for Washington DC, Massachusetts, and Illinois.';
+  'Free LIHEAP benefit calculator — estimate your Low Income Home Energy Assistance Program eligibility and benefit amount in all 50 states and DC.';
 
 export const metadata: Metadata = {
   title: SITE_TITLE,
